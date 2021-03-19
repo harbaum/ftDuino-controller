@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ftDuino32 - Blockly</title>
+    <link rel="stylesheet" href="./picnic.min.css" />
+    <link rel="stylesheet" href="./style.css" />
+    <script src="./blockly/blockly_compressed.js"></script>
+    <script src="./blockly/blocks_compressed.js"></script>
+    <script src="./blockly/python_compressed.js"></script>
+    <script src="./blockly/msg/js/en.js"></script>
+    <script src="./blockly/code.js"></script>
+    <script src="./common.js"></script>
+  </head>
+  
+  <body>
+    <nav>
+      <a href="index.html" class="brand">ftDuino32</a>
+      
+      <input id="bmenub" type="checkbox" class="show">
+      <label for="bmenub" class="burger pseudo button">&#9776;</label>
+      
+      <div class="menu">
+	<label onclick="menu_hide(); toggle_fullscreen();" class="button">Fullscreen</label>
+	<div class="button" style="background-color: transparent; padding: 0;">
+	  <input id="project" size="10" placeholder="myproject" style="margin: 0; width: calc(100% - 5em - 5px)" onchange="input_filename_limit('project');" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();">
+	  <label onclick="menu_hide(); upload();" class="button" style="margin: 0; align: right; width:5em">Save</label>
+	</div>
+      </div>
+    </nav>
+
+    <div class="navbg"></div>
+    <div class="main" id="blocklyDiv"></div>
+    <div id="status"></div>
+  </body>
+</html>

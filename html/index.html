@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>ftDuino32</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <link rel="stylesheet" href="./picnic.min.css" />
+    <link rel="stylesheet" href="./style.css" />
+    <meta name="description" content="ftDuino32 Controller">
+    <script src="./common.js"></script>
+    <script src="./liveview.js"></script>
+    <script src="./zlib_and_gzip.min.js"></script>    
+
+    <script>
+      var projects = [];
+      var live_window = undefined;
+
+      function upload(cb) {
+	  var files = document.getElementById("file").files;
+	  console.log("Upload files:", files);
+	  if(files.length > 0 ) {
+	      set_status(status.info, "Uploading ...");
+
+	      var is_sd = document.getElementById("sd").checked;
+	      var path = is_sd?"sd/apps/":"apps/";
+
+	      var type = files[0].name.endsWith(".py")?"python":"blockly";
+	      
+	      var formData = new FormData();
+	      formData.append(type, files[0], path+files[0].name);
+	      
+	      var request = new XMLHttpRequest();
+	      // call on request changes state
+	      request.onreadystatechange = function() {
+		  console.log("http status", request.readyState, request.status);
+		  if (request.readyState == 4) {
+		      if(request.status == 200)
+			  set_status(status.success, "Upload ok");
+		      else
+			  set_status(status.error, "Upload failed: " + request.statusText);
+		      
+		      if(cb) cb(request.status == 200);
+		  }
+	      };
+	      // Send request with data
+	      request.open("POST", "upload/"+type, true);
+	      request.setRequestHeader("Cache-Control", "no-cache");
+	      request.send( formData );
+	  } else {
+	      alert("Please select a file");
+	  }
+      }
+
+      function ext(filename) {
+	  var parts = filename.split('.')
+	  return parts[parts.length - 1];
+      }
+      
+      function basename(filename) {
+	  return filename.split('.').slice(0, -1).join('.');
+      }
+      
+      function add_options(list, title, blockly, projects) {
+	  if(projects.length) {
+	      var optgroup = document.createElement("optgroup");
+	      optgroup.setAttribute("label", title);	  
+	      projects.forEach(project => {
+		  // display any blockly project in the blockly list
+		  // and any non-blockly project in the python list
+		  if((blockly && project["blockly"]) ||
+		     (!blockly && !project["blockly"])) {
+		      var option = document.createElement("option");
+		      option.value = project["name"];
+		      option.textContent = project["name"];
+		      optgroup.appendChild(option);
+		  }
+	      })
+	      list.add(optgroup);
+	  }
+      }
+      
+      function create_filelisting(data, update_status) {
+	  // grab all python files into a list
+	  projects = [ ]
+	  
+	  data.forEach(f => {
+	      // only accept py or xml files
+	      if(f[1] == 32768 && (ext(f[0]) == "py") || (ext(f[0]) == "xml")) {
+		  // check if a project of that name aready exists in the list
+		  var prj_index = -1;
+		  for(var i=0;i<projects.length;i++)
+		      if(projects[i]["name"] == basename(f[0])) prj_index = i;
+
+		  if(prj_index >= 0) {
+		      // update existing project entry
+		      if(ext(f[0]) == "py") projects[prj_index]["python"]  = f[0];
+		      else                  projects[prj_index]["blockly"] = f[0];
+		  } else {
+		      // create new project enry
+		      var prj = { "name": basename(f[0]), "size": f[3] }
+		      if(ext(f[0]) == "py") prj["python"]  = f[0];
+		      else                  prj["blockly"] = f[0];
+		      
+		      projects.push(prj);
+		  }
+	      }
+	  });
+
+	  // sort projects alphabetically
+	  projects.sort((a, b) =>
+	       (a["name"].toLowerCase().localeCompare(b["name"].toLowerCase())));
+
+	  var plist = document.getElementById("plist");
+	  add_options(plist, "Blockly", true, projects);
+	  add_options(plist, "Python", false, projects);
+
+	  // make plist usable
+	  if(projects.length) plist.removeAttribute("disabled");
+
+	  // try to restore previous project selection
+	  var is_sd = document.getElementById("sd").checked;
+	  var default_project = projects[0];
+	  var prj = getCookie("project_"+(is_sd?"sd":"internal"));
+	  if(prj) {
+	      projects.forEach(p => {
+		  if(p["name"] == prj) {
+		      plist.value = prj;
+		      sel_prj(p);
+		      default_project = null;
+		  }
+	      });
+	  }
+
+	  if(default_project)
+	      sel_prj(default_project);
+
+	  if(update_status)
+	      set_status(status.success, projects.length + " projects on "+
+			 (is_sd?"SD card":"internal flash"));
+      }
+      
+      function enable(name, state) {
+	  document.getElementById("name").disabled = !state;
+      }				    
+      
+      function get_prj_by_name(name) {
+	  var project;
+	  projects.forEach(p => {
+	      if(p["name"] == name) {
+		  project = p;
+	      }
+	  });
+	  return project;
+      }
+	  
+      function sel_prj_by_name(name) {
+	  sel_prj(get_prj_by_name(name));
+      }
+	  
+      function sel_prj(prj) {
+	  var is_sd = document.getElementById("sd").checked;
+	  var path = is_sd?"sd/apps/":"apps/";
+
+	  console.log("selected project", prj["name"], "on", is_sd?"sd card":"internal flash");
+
+	  var btnp = document.getElementById("btnp");
+	  var btnb = document.getElementById("btnb");
+	  var btnr = document.getElementById("btnr");
+	  btnr.classList.add("disabled");  // disable run button by default
+
+	  setCookie("storage", is_sd?"sd":"internal", 30);
+	  setCookie("project_"+(is_sd?"sd":"internal"), prj["name"], 30);
+	  
+	  if(prj) {
+	      var prj_file = encodeURI(path+prj["name"])	      
+	      if(prj["blockly"]) {
+		  btnb.removeAttribute("disabled");
+		  btnb.onclick = function() { location.href="blockly.html?project="+prj_file+".xml"; }
+	      } else
+		  btnb.disabled = true;
+	      
+	      if(prj["python"]) {
+		  btnp.removeAttribute("disabled");
+		  btnr.classList.remove("disabled");
+		  btnp.onclick = function() { location.href="cm.html?project="+prj_file+".py"; }
+	      } else
+		  btnp.disabled = true;
+	  } else {
+	      document.getElementById("oldname").innerHTML = "";
+	      btnp.disabled = true;
+	      btnb.disabled = true;
+	  }
+      }
+      
+      function list_dir(update_status) {
+	  if(update_status)
+	      set_status(status.info, "Loading project list...");
+	  
+	  // check flash/sd selector for correct directory
+	  var dir = "/apps/";	  
+	  if(document.getElementById("sd").checked)
+	      dir = "/sd/apps/";
+
+	  // assume the whole list gone
+	  projects = [];
+	  document.getElementById('plist').innerHTML = ""
+
+	  // make gui unresponsive
+	  document.getElementById("plist").disabled = true;
+	  document.getElementById("btnb").disabled = true;
+	  document.getElementById("btnp").disabled = true;	  
+	  document.getElementById("btnr").classList.add("disabled");
+	  
+	  var request = new XMLHttpRequest();
+	  // call on request changes state
+	  request.onreadystatechange = function() {
+	      if (request.readyState == 4) {
+		  if(request.status == 200) {
+		      if(update_status)
+			  set_status(status.success, "Listing ok");
+		      create_filelisting(JSON.parse(request.responseText), update_status);
+		  } else {
+		      if(update_status)
+			  set_status(status.error, "Listing failed: " + request.statusText);
+		  }
+	      }
+	  };
+	  // Send request with data
+	  request.open("GET", "files"+dir, true);
+	  request.setRequestHeader("Cache-Control", "no-cache");
+	  request.send( null );
+      }
+      
+      function setCookie(name,value,days) {
+	  var expires = "";
+	  if (days) {
+              var date = new Date();
+              date.setTime(date.getTime() + (days*24*60*60*1000));
+              expires = "; expires=" + date.toUTCString();
+	  }
+	  document.cookie = name + "=" + (value || "")  + expires + "; path=/; SameSite=Lax";
+      }
+      
+      function getCookie(name) {
+	  var nameEQ = name + "=";
+	  var ca = document.cookie.split(';');
+	  for(var i=0;i < ca.length;i++) {
+              var c = ca[i];
+              while (c.charAt(0)==' ') c = c.substring(1,c.length);
+              if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+	  }
+	  return null;
+      }
+      
+      function eraseCookie(name) {   
+	  document.cookie = name +'=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      }
+
+      function more_change_cmd() {
+	  // prefill "new" name with old one
+	  if(document.getElementById("cmdlist").value == "ren") {
+	      document.getElementById("newname").value =
+		  document.getElementById("plist").value;
+	      
+	      input_filename_limit("newname");
+	  } else
+	      document.getElementById("newname").value = "";
+	      
+	  more_dialog_update();
+      }
+	  
+      function more_dialog_update() {
+	  // setup "oldname"'s in manage modal dialog
+	  document.getElementById("oldname").innerHTML =
+	      document.getElementById("plist").value;
+
+	  var cmd = document.getElementById("cmdlist").value;
+	  document.getElementById("confirm_div").hidden = (cmd != "del");
+	  document.getElementById("oldname_div").hidden =
+	      (cmd != "ren") && (cmd != "del") && (cmd != "cpy") && (cmd != "exp");
+	  document.getElementById("prj_type_div").hidden = (cmd != "new");
+	  document.getElementById("new_name_div").hidden = (cmd != "new") && (cmd != "ren");
+	  document.getElementById("copy_div").hidden = (cmd != "cpy");
+	  document.getElementById("download_div").hidden = (cmd != "exp");
+	  document.getElementById("upload_div").hidden = (cmd != "imp");
+	  
+	  // if no project is available then it cannot be handled
+	  var project_ok = !document.getElementById("plist").disabled;
+	  document.getElementById("option_del").disabled = !project_ok;
+	  document.getElementById("option_ren").disabled = !project_ok;
+	  document.getElementById("option_cpy").disabled = !project_ok;
+	  document.getElementById("option_exp").disabled = !project_ok;
+	      
+	  if(cmd == "new" || cmd == "ren") {
+	      newname = document.getElementById("newname").value;
+	      
+	      // don't allow user to create an ampty project or one with a name that
+	      // already exists
+	      var inlist = false;
+	      projects.forEach(i => { if(i.name == newname) inlist = true; } );
+	      document.getElementById("btng").disabled = !newname || inlist;
+	  }
+
+	  if(cmd == "del") {
+	      document.getElementById("btng").disabled =
+		  !document.getElementById("confirmcb").checked;
+	  }
+	  
+	  if(cmd == "cpy") {
+	      var is_sd = document.getElementById("sd").checked;
+	      document.getElementById("mem").innerHTML = is_sd?"internal flash":"SD card";
+	      document.getElementById("btng").disabled = false;
+	  }
+	  
+	  if(cmd == "exp") {
+	      var is_sd = document.getElementById("sd").checked;
+	      var path = is_sd?"sd/apps/":"apps/";
+	  
+	      // setup download button, fetch project type and name from main gui
+	      var old_type = (!document.getElementById("btnb").disabled)?"blockly":"python";
+	      var old_name = document.getElementById("plist").value;
+	      var old_prj_file = "files/"+encodeURI(path+old_name)+((old_type=="blockly")?".xml":".py");
+
+	      document.getElementById("link").href = old_prj_file;	      
+	  }
+	  
+	  if(cmd == "imp") {
+	      checkfile();
+	  }
+      }
+
+      function on_more_closed() {
+	  // the close animation runs for < 0.5sec
+	  setTimeout(function(){
+	      // doing this when opening or when closing the dialog breaks
+	      // the grow/shrink animation for the button on firefox mobile
+	      document.getElementById("btng").disabled = true;
+	  }, 500);
+      }
+      
+      function on_more() {
+	  // bring "more" dialog into default state ...
+	  document.getElementById("btng").disabled = true;
+	  document.getElementById("cmdlist").value = "non";
+	  document.getElementById("confirmcb").checked = false;
+	  document.getElementById("newname").value = "";
+
+	  more_dialog_update();  // force update of dialog
+
+	  // ... and finally open it
+	  document.getElementById('more').checked = true;
+      }
+
+      function on_action_ok() {
+	  document.getElementById('more').checked = false;
+
+	  var is_sd = document.getElementById("sd").checked;
+	  var path = is_sd?"sd/apps/":"apps/";
+	  
+	  var new_type = document.getElementById("typelist").value;
+	  var new_name = document.getElementById("newname").value;
+	  var new_prj_file = encodeURI(path+new_name)
+
+	  // fetch project type and name from main gui
+	  var old_type = (!document.getElementById("btnb").disabled)?"blockly":"python";
+	  var old_name = document.getElementById("plist").value;
+	  var old_prj_file = encodeURI(path+old_name)
+
+	  console.log("Command: " + document.getElementById("cmdlist").value);
+	  
+	  switch(document.getElementById("cmdlist").value) {
+	  case "new":
+	      setCookie("storage", is_sd?"sd":"internal", 30);
+	      setCookie("project_"+(is_sd?"sd":"internal"), new_name, 30);
+	      
+	      if(new_type == "blockly")     location.href="blockly.html?project="+new_prj_file+".xml";
+	      else if(new_type == "python") location.href="cm.html?project="+new_prj_file+".xml";
+	      break;
+	  case "del":
+	      post_cmd({ "cmd": "delete", "project": old_prj_file }, cmd_cb);
+	      break;
+	  case "cpy":
+	      // try to set newly created copy
+	      document.getElementById(is_sd?"sd":"internal").checked = false;
+	      document.getElementById(is_sd?"internal":"sd").checked = true;
+
+	      // set cookie with inverted sd/internal logic
+	      setCookie("storage",  (!is_sd)?"sd":"internal", 30);
+	      setCookie("project_"+(!(is_sd)?"sd":"internal"), old_name, 30);
+	      
+	      post_cmd({ "cmd": "copy", "project": old_prj_file }, cmd_cb);
+	      break;
+	  case "ren":
+	      // try to set renamed project
+	      document.getElementById("plist").value = new_name;	      
+	      setCookie("project_"+(is_sd?"sd":"internal"), new_name, 30);
+	      
+	      post_cmd({ "cmd": "rename", "project": old_prj_file, "new": new_prj_file }, cmd_cb);
+	      break;
+	  case "imp":
+	      upload(cmd_cb);	      
+	      break;
+	  case "exp":
+	      break;
+	  default:
+	      alert("Fix me!!!");
+	      break;
+	  }
+	  on_more_closed();
+      }
+
+      function cmd_cb(ok) {
+	  if(ok) list_dir(false);
+      }
+
+      function run() {
+	  // the button may be disabled- Ignore clicks then
+	  if(document.getElementById("btnr").classList.contains("disabled"))
+	      return;	      
+
+	  //
+	  var is_sd = document.getElementById("sd").checked;
+	  var name = encodeURI(document.getElementById("plist").value);	  
+	  post_cmd({ "cmd": "run", "sd": is_sd, "name": name }, null);
+      }
+
+      function checkfile() {
+	  if(document.getElementById("cmdlist").value == "imp") {
+	      var file = document.getElementById("file").files[0].name;
+	      document.getElementById("btng").disabled = !file;
+	      document.getElementById("filename").innerHTML = file;
+	  }
+      }
+      
+      function init() {
+	  live_window = new Window();
+
+	  // check if we used sd or internal flash last time
+	  var storage = getCookie("storage");
+
+	  // after a reload "sd" and "internal" are sometimes de-selected
+	  // select "internal" then
+	  document.getElementById("sd").checked = (storage == "sd");
+	  document.getElementById("internal").checked = (storage != "sd");
+
+	  // setup action gui
+	  document.getElementById("cmdlist").selectedIndex = 0;
+	  document.getElementById("btng").disabled = true;
+	  
+	  list_dir(true);
+      }
+
+      window.addEventListener('load', init);
+    </script>
+  </head>
+
+  <body>
+    <nav>
+      <a href="index.html" class="brand">ftDuino32</a>
+      <input id="bmenub" type="checkbox" class="show">
+      <label for="bmenub" class="burger pseudo button">&#9776;</label>
+
+      <div class="menu">
+	<label onclick="menu_hide();" for="about" class="button">About</label>
+	<label onclick="menu_hide(); toggle_fullscreen();" class="button">Fullscreen</label>
+	<label onclick="menu_hide(); live_window.toggle();" class="button">Live view</label>
+      </div>
+    </nav>
+    <div class="navbg"></div>
+    
+    <div class="modal">
+      <input id="about" type="checkbox" />
+      <label for="about" class="overlay"></label>
+      <article>
+	<header>
+	  <h3>About ftDuino32</h3>
+	  <label for="about" class="close">&times;</label>
+	</header>
+	<section class="content">
+	  This ftduino32 firmware is based on various projects including:
+	  <ul>
+	    <li><a href="https://micropython.org/">Micropython</a></li>
+	    <li><a href="https://lvgl.io/">LVGL</a> and <a href="https://github.com/lvgl/lv_micropython">Micropython bindings</a></li>
+	    <li><a href="https://developers.google.com/blockly">Blockly</a> and <a href="https://codemirror.net/">CodeMirror</a> editors</li>
+	    <li><a href="https://picnicss.com">Picnic CSS</a></li>
+	  </ul>
+	</section>
+      </article>
+    </div>
+    
+    <div class="modal">
+      <input id="more" type="checkbox" onchange="on_more_closed();"/>
+      <label for="more" class="overlay"></label>
+      <article>
+	<header>
+	  <h4>Manage Project</h4>
+	  <select class="actionselect" id="cmdlist" style="width: 6.5em;" onchange="more_change_cmd();">
+	    <option id="option_non" value="non" hidden selected>Select...</option> 
+	    <option id="option_new" value="new">New</option> 
+	    <option id="option_del" value="del">Delete</option>
+	    <option id="option_ren" value="ren">Rename</option>
+	    <option id="option_cpy" value="cpy">Copy</option>
+	    <option id="option_exp" value="exp">Export</option>
+	    <option id="option_imp" value="imp">Import</option>
+	  </select>
+	</header>
+	<section class="content">
+	  <table>
+
+	    <tr hidden class="actionrow" id="oldname_div">
+	      <td>Project:</td>
+	      <td><label class="prjname" id="oldname">old name</label></td>
+	    </tr>
+
+	    <tr hidden class="actionrow" id="confirm_div">
+	      <td colspan="2"><label>
+		  <input type="checkbox" id="confirmcb" onclick="more_dialog_update()">
+		  <span class="checkable">confirm deletion</span>
+	      </label></td>
+	    </tr>
+
+	    <tr hidden class="actionrow" id="copy_div">
+	      <td>Copy to </td>
+	      <td id="mem">mem</td>
+	    </tr>
+
+	    <tr hidden class="actionrow" id="prj_type_div">
+	      <td>Type:</td>
+	      <td><select id="typelist" style="width: 6em">
+		  <!-- &#x1F9E9; &#128013; -->
+		  <option value="blockly">Blockly</option> 
+		  <option value="python">Python</option>
+	      </select></td>
+	    </tr>
+
+	    <tr hidden class="actionrow" id="download_div">
+	      <td colspan="2">
+		<a id="link" href="path/to/file" download>Click here to download</a>
+	      </td>
+	    </tr>
+	    
+	    <tr hidden class="actionrow" id="upload_div">
+	      <td>
+		<label class="button" for="file">File...</label>
+		<input hidden type="file" id="file" name="file" onchange="checkfile();" accept="text/x-python,application/xml"/>
+		<td><label id="filename"></label></td>
+	      </td>
+	    </tr>
+
+	    <tr hidden class="actionrow" id="new_name_div">
+	      <td>New name:</td>
+	      <td><input id="newname" size="5em" onchange="input_filename_limit('newname'); more_dialog_update();" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();" placeholder="myproject" style="margin: 0; width: 10em"></td>
+	    </tr>
+
+	  </table>
+	</section>
+	<footer>
+	  <label for="more" class="button">Cancel</label>
+	  <button id="btng" for="more" disabled hidden class="button" onclick="on_action_ok()">Ok</button>
+	</footer>
+      </article>
+    </div>
+    
+    <div class="main">
+      <div class="sec"> <!-- class="flex"> -->
+	<div class="topsec">
+	  <p/>
+      
+	  <div>
+	    <label class="hstack"><input name="storage" type="radio" id="internal" onclick="list_dir(true);"><span class="button toggle">Internal flash</span></label><label class="hstack"><input name="storage" type="radio" id="sd" onclick="list_dir(true);"><span class="button toggle">SD card</span></label>
+	  </div>
+	  <p/>
+	  
+	  <label for="plist">Project:</label>
+	  <select id="plist" style="width: 15em" disabled onchange="sel_prj_by_name(this.value);">
+	  </select>
+	  <br/>Open
+	  <button id="btnb" disabled>Blockly</button>
+	  <button id="btnp" disabled>Python</button>	
+	  <button id="btnm" class="pseudo" onclick="on_more();">More...</button>
+	</div>
+	  
+	<div class="botsec">
+	  <p/>
+	  <svg height="100" width="100">
+	    <circle id="btnr" cx="50" cy="50" r="40" class="btn btnbg disabled" onclick="run()" />
+	    <polygon points="35,30 35,70 70,50" class="btn btnfg" />
+	  </svg> 
+	</div>
+      </div>
+    </div>
+    
+    <div id="status"></div>
+
+    <!-- the liveview window -->
+    <div id="window">
+      <div id="windowBar">
+        <div>Live view</div>
+        <div id="windowClose">&times;</div>
+      </div>
+      <canvas id="windowView" width="240px" height="320px"></canvas>
+    </div>
+  
+  </body>
+</html>

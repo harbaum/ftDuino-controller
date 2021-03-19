@@ -1,0 +1,224 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+	  
+body {
+    background-color: #f0f0f0;
+    display: flex;
+    flex-flow: column;
+}
+
+nav {
+    background-color: #0074d9;
+    color: white;
+}
+
+.navbg {
+    flex: 0 1 3em;
+    height: 3em;	
+    min-height: 3em;
+}
+ 
+/* undo 100% width on project name input */
+#project {
+    color: #404040;
+    width: unset;
+}
+
+/* make less high unless it's a file selector */
+#project:not([type='file']) {
+    height: 1.8em;
+}
+
+/* these are the main contents of all three pages */
+.main, .CodeMirror {
+    flex: 1 1 auto;
+    height: 10px;
+}
+
+/* the status bar at the very bottom */
+#status {
+    background-color: #e0e0e0;
+    border: 1px solid grey;
+    flex: 0 1 1.8em;
+    min-height: 1.8em;
+    height: 1.8em;
+}
+
+.hstack,
+.hstack .toggle {
+    width: 150px;  /* this is ugly ... */
+    margin-left: 0;
+    margin-right: 0;
+    text-align: center;
+    border-radius: 0;
+}
+
+.hstack:first-child,
+.hstack:first-child .toggle {
+    border-top-left-radius: 0.2em;
+    border-bottom-left-radius: 0.2em;
+}
+
+.hstack:last-child,
+.hstack:last-child .toggle {
+    border-top-right-radius: 0.2em;
+    border-bottom-right-radius: 0.2em;
+}
+
+.actionrow:nth-child(2n) {
+    background: unset;
+}
+
+.prjname {
+    font-weight: bold;
+}
+
+/* prevent modal from getting wide on small screens */
+@media (min-width: 50em) {
+  .modal .overlay ~ * {
+    min-width: unset; } }
+
+/* .modal .overlay ~ * section */
+.modal .overlay ~ * section {
+    padding: .4em .6em 0;
+}
+
+td, th {
+    padding: 0.2em .2em 0 .2em;
+}
+
+.modal .overlay ~ * header h4 {
+    padding-top: 11px; padding-bottom: 4px;
+}
+
+.modal .overlay ~ * header select {
+    float: right;
+}
+
+.btn:not(.disabled) {
+    cursor: pointer;    
+}
+
+.btnfg {
+    fill: white;
+    pointer-events : none; 
+}
+
+.btnbg {
+    fill: #0074d9;
+    transition: all 0.3s;
+}
+
+.btnbg:hover:not(.disabled) {
+    fill: #3390e1;
+}
+
+.btnbg:active:not(.disabled) {
+    fill: #0360b1;
+}
+
+.btn.disabled {
+    fill: #aaaaaa;
+}
+
+.topsec, .botsec {
+    text-align: center;
+}
+	
+@media screen and (min-width: 600px) {
+    .sec {
+	display: flex;
+	justify-content : center;
+	align-items: center;
+    }
+    
+    .topsec {
+	text-align: right;
+    }
+    
+    .botsec {
+	margin-left: 1em;
+	text-align: left;
+    }
+}
+    
+/* everything needed for the live view */
+.liveview_bg {
+    background-color: #00000040;
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.liveview_canvas {
+    color: official;
+    display: inline-block;
+    position: relative;
+    width: 240px;
+    height: 320px;
+    background-color: white;
+    border: 1px solid black;
+    top: calc(1.5em + 50% - 170px);
+    left: calc(50% - 120px);
+    box-shadow: 10px 10px 5px #00000040;
+    padding: 0;
+    z-index: 10;
+}
+
+#window {
+    z-index: 1000000;
+    border-radius: 0.3em;
+    border: 1px solid grey;
+    background-color: white;
+    position: absolute;
+    display: none;
+
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+
+    box-shadow: 10px 10px 5px #00000040;
+}
+
+#windowBar {
+    border-top-radius: 0.3em;
+    padding-left: 20px;
+    padding-top: 6px;
+    height: 40px;
+    cursor: move;
+    background-color: #0360b1;
+    color: white;
+    font-weight: bold;
+}
+
+#windowClose {
+    cursor: pointer;
+    display: inline-block;
+    position: absolute;
+    border-radius: 0.3em;
+    top: 5px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    bottom: 10px;
+    color: white;
+    padding: 0;
+    line-height: 30px;
+}
+
+#windowView {
+    margin: 3px;
+    width: 240px;
+    height: 320px;
+}

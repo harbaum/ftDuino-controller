@@ -1,0 +1,1164 @@
+diff -Naur orig/components/esp_http_server/include/esp_http_server.h new/components/esp_http_server/include/esp_http_server.h
+--- orig/components/esp_http_server/include/esp_http_server.h	2021-03-19 13:09:06.061072019 +0100
++++ new/components/esp_http_server/include/esp_http_server.h	2021-02-09 21:14:18.000000000 +0100
+@@ -399,6 +399,25 @@
+      * Pointer to user context data which will be available to handler
+      */
+     void *user_ctx;
++
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++    /**
++     * Flag for indicating a WebSocket endpoint.
++     * If this flag is true, then method must be HTTP_GET. Otherwise the handshake will not be handled.
++     */
++    bool is_websocket;
++
++    /**
++     * Flag indicating that control frames (PING, PONG, CLOSE) are also passed to the handler
++     * This is used if a custom processing of the control frames is needed
++     */
++    bool handle_ws_control_frames;
++
++    /**
++     * Pointer to subprotocol supported by URI
++     */
++    const char *supported_subprotocol;
++#endif
+ } httpd_uri_t;
+ 
+ /**
+@@ -521,6 +540,17 @@
+      */
+     HTTPD_400_BAD_REQUEST,
+ 
++    /* This response means the client must authenticate itself
++     * to get the requested response.
++     */
++    HTTPD_401_UNAUTHORIZED,
++
++    /* The client does not have access rights to the content,
++     * so the server is refusing to give the requested resource.
++     * Unlike 401, the client's identity is known to the server.
++     */
++    HTTPD_403_FORBIDDEN,
++
+     /* When requested URI is not found */
+     HTTPD_404_NOT_FOUND,
+ 
+@@ -1039,7 +1069,7 @@
+  *  - ESP_ERR_HTTPD_INVALID_REQ : Invalid request
+  */
+ static inline esp_err_t httpd_resp_sendstr(httpd_req_t *r, const char *str) {
+-    return httpd_resp_send(r, str, (str == NULL) ? 0 : strlen(str));
++    return httpd_resp_send(r, str, (str == NULL) ? 0 : HTTPD_RESP_USE_STRLEN);
+ }
+ 
+ /**
+@@ -1060,7 +1090,7 @@
+  *  - ESP_ERR_HTTPD_INVALID_REQ : Invalid request
+  */
+ static inline esp_err_t httpd_resp_sendstr_chunk(httpd_req_t *r, const char *str) {
+-    return httpd_resp_send_chunk(r, str, (str == NULL) ? 0 : strlen(str));
++    return httpd_resp_send_chunk(r, str, (str == NULL) ? 0 : HTTPD_RESP_USE_STRLEN);
+ }
+ 
+ /* Some commonly used status codes */
+@@ -1284,6 +1314,53 @@
+  */
+ int httpd_send(httpd_req_t *r, const char *buf, size_t buf_len);
+ 
++/**
++ * A low level API to send data on a given socket
++ *
++ * @note This API is not recommended to be used in any request handler.
++ * Use this only for advanced use cases, wherein some asynchronous
++ * data is to be sent over a socket.
++ *
++ * This internally calls the default send function, or the function registered by
++ * httpd_sess_set_send_override().
++ *
++ * @param[in] hd        server instance
++ * @param[in] sockfd    session socket file descriptor
++ * @param[in] buf       buffer with bytes to send
++ * @param[in] buf_len   data size
++ * @param[in] flags     flags for the send() function
++ * @return
++ *  - Bytes : The number of bytes sent successfully
++ *  - HTTPD_SOCK_ERR_INVALID  : Invalid arguments
++ *  - HTTPD_SOCK_ERR_TIMEOUT  : Timeout/interrupted while calling socket send()
++ *  - HTTPD_SOCK_ERR_FAIL     : Unrecoverable error while calling socket send()
++ */
++int httpd_socket_send(httpd_handle_t hd, int sockfd, const char *buf, size_t buf_len, int flags);
++
++/**
++ * A low level API to receive data from a given socket
++ *
++ * @note This API is not recommended to be used in any request handler.
++ * Use this only for advanced use cases, wherein some asynchronous
++ * communication is required.
++ *
++ * This internally calls the default recv function, or the function registered by
++ * httpd_sess_set_recv_override().
++ *
++ * @param[in] hd        server instance
++ * @param[in] sockfd    session socket file descriptor
++ * @param[in] buf       buffer with bytes to send
++ * @param[in] buf_len   data size
++ * @param[in] flags     flags for the send() function
++ * @return
++ *  - Bytes : The number of bytes received successfully
++ *  - 0     : Buffer length parameter is zero / connection closed by peer
++ *  - HTTPD_SOCK_ERR_INVALID  : Invalid arguments
++ *  - HTTPD_SOCK_ERR_TIMEOUT  : Timeout/interrupted while calling socket recv()
++ *  - HTTPD_SOCK_ERR_FAIL     : Unrecoverable error while calling socket recv()
++ */
++int httpd_socket_recv(httpd_handle_t hd, int sockfd, char *buf, size_t buf_len, int flags);
++
+ /** End of Request / Response
+  * @}
+  */
+@@ -1411,6 +1488,20 @@
+  */
+ esp_err_t httpd_sess_update_lru_counter(httpd_handle_t handle, int sockfd);
+ 
++/**
++ * @brief   Returns list of current socket descriptors of active sessions
++ *
++ * @param[in] handle    Handle to server returned by httpd_start
++ * @param[in,out] fds   In: Number of fds allocated in the supplied structure client_fds
++ *                      Out: Number of valid client fds returned in client_fds,
++ * @param[out] client_fds  Array of client fds
++ *
++ * @return
++ *  - ESP_OK              : Successfully retrieved session list
++ *  - ESP_ERR_INVALID_ARG : Wrong arguments or list is longer than allocated
++ */
++esp_err_t httpd_get_client_list(httpd_handle_t handle, size_t *fds, int *client_fds);
++
+ /** End of Session
+  * @}
+  */
+@@ -1452,6 +1543,112 @@
+  * @}
+  */
+ 
++/* ************** Group: WebSocket ************** */
++/** @name WebSocket
++ * Functions and structs for WebSocket server
++ * @{
++ */
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++/**
++ * @brief Enum for WebSocket packet types (Opcode in the header)
++ * @note Please refer to RFC6455 Section 5.4 for more details
++ */
++typedef enum {
++    HTTPD_WS_TYPE_CONTINUE   = 0x0,
++    HTTPD_WS_TYPE_TEXT       = 0x1,
++    HTTPD_WS_TYPE_BINARY     = 0x2,
++    HTTPD_WS_TYPE_CLOSE      = 0x8,
++    HTTPD_WS_TYPE_PING       = 0x9,
++    HTTPD_WS_TYPE_PONG       = 0xA
++} httpd_ws_type_t;
++
++/**
++ * @brief Enum for client info description
++ */
++typedef enum {
++    HTTPD_WS_CLIENT_INVALID        = 0x0,
++    HTTPD_WS_CLIENT_HTTP           = 0x1,
++    HTTPD_WS_CLIENT_WEBSOCKET      = 0x2,
++} httpd_ws_client_info_t;
++
++/**
++ * @brief WebSocket frame format
++ */
++typedef struct httpd_ws_frame {
++    bool final;                 /*!< Final frame:
++                                     For received frames this field indicates whether the `FIN` flag was set.
++                                     For frames to be transmitted, this field is only used if the `fragmented`
++                                         option is set as well. If `fragmented` is false, the `FIN` flag is set
++                                         by default, marking the ws_frame as a complete/unfragmented message
++                                         (esp_http_server doesn't automatically fragment messages) */
++    bool fragmented;            /*!< Indication that the frame allocated for transmission is a message fragment,
++                                     so the `FIN` flag is set manually according to the `final` option.
++                                     This flag is never set for received messages */
++    httpd_ws_type_t type;       /*!< WebSocket frame type */
++    uint8_t *payload;           /*!< Pre-allocated data buffer */
++    size_t len;                 /*!< Length of the WebSocket data */
++} httpd_ws_frame_t;
++
++/**
++ * @brief Receive and parse a WebSocket frame
++ * @param[in]   req         Current request
++ * @param[out]  pkt         WebSocket packet
++ * @param[in]   max_len     Maximum length for receive
++ * @return
++ *  - ESP_OK                    : On successful
++ *  - ESP_FAIL                  : Socket errors occurs
++ *  - ESP_ERR_INVALID_STATE     : Handshake was already done beforehand
++ *  - ESP_ERR_INVALID_ARG       : Argument is invalid (null or non-WebSocket)
++ */
++esp_err_t httpd_ws_recv_frame(httpd_req_t *req, httpd_ws_frame_t *pkt, size_t max_len);
++
++/**
++ * @brief Construct and send a WebSocket frame
++ * @param[in]   req     Current request
++ * @param[in]   pkt     WebSocket frame
++ * @return
++ *  - ESP_OK                    : On successful
++ *  - ESP_FAIL                  : When socket errors occurs
++ *  - ESP_ERR_INVALID_STATE     : Handshake was already done beforehand
++ *  - ESP_ERR_INVALID_ARG       : Argument is invalid (null or non-WebSocket)
++ */
++esp_err_t httpd_ws_send_frame(httpd_req_t *req, httpd_ws_frame_t *pkt);
++
++/**
++ * @brief Low level send of a WebSocket frame out of the scope of current request
++ * using internally configured httpd send function
++ *
++ * This API should rarely be called directly, with an exception of asynchronous send using httpd_queue_work.
++ *
++ * @param[in] hd      Server instance data
++ * @param[in] fd      Socket descriptor for sending data
++ * @param[in] frame     WebSocket frame
++ * @return
++ *  - ESP_OK                    : On successful
++ *  - ESP_FAIL                  : When socket errors occurs
++ *  - ESP_ERR_INVALID_STATE     : Handshake was already done beforehand
++ *  - ESP_ERR_INVALID_ARG       : Argument is invalid (null or non-WebSocket)
++ */
++esp_err_t httpd_ws_send_frame_async(httpd_handle_t hd, int fd, httpd_ws_frame_t *frame);
++
++/**
++ * @brief Checks the supplied socket descriptor if it belongs to any active client
++ * of this server instance and if the websoket protocol is active
++ *
++ * @param[in] hd      Server instance data
++ * @param[in] fd      Socket descriptor
++ * @return
++ *  - HTTPD_WS_CLIENT_INVALID   : This fd is not a client of this httpd
++ *  - HTTPD_WS_CLIENT_HTTP      : This fd is an active client, protocol is not WS
++ *  - HTTPD_WS_CLIENT_WEBSOCKET : This fd is an active client, protocol is WS
++ */
++httpd_ws_client_info_t httpd_ws_get_fd_info(httpd_handle_t hd, int fd);
++
++#endif /* CONFIG_HTTPD_WS_SUPPORT */
++/** End of WebSocket related stuff
++ * @}
++ */
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff -Naur orig/components/esp_http_server/src/esp_httpd_priv.h new/components/esp_http_server/src/esp_httpd_priv.h
+--- orig/components/esp_http_server/src/esp_httpd_priv.h	2021-03-19 13:09:06.061072019 +0100
++++ new/components/esp_http_server/src/esp_httpd_priv.h	2021-03-04 14:44:57.631173271 +0100
+@@ -69,8 +69,16 @@
+     httpd_recv_func_t recv_fn;              /*!< Receive function for this socket */
+     httpd_pending_func_t pending_fn;        /*!< Pending function for this socket */
+     uint64_t lru_counter;                   /*!< LRU Counter indicating when the socket was last used */
++    bool lru_socket;                        /*!< Flag indicating LRU socket */
+     char pending_data[PARSER_BLOCK_SIZE];   /*!< Buffer for pending data to be received */
+     size_t pending_len;                     /*!< Length of pending data to be received */
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++    bool ws_handshake_done;                 /*!< True if it has done WebSocket handshake (if this socket is a valid WS) */
++    bool ws_close;                          /*!< Set to true to close the socket later (when WS Close frame received) */
++    esp_err_t (*ws_handler)(httpd_req_t *r);   /*!< WebSocket handler, leave to null if it's not WebSocket */
++    bool ws_control_frames;                         /*!< WebSocket flag indicating that control frames should be passed to user handlers */
++    void *ws_user_ctx;                         /*!< Pointer to user context data which will be available to handler for websocket*/
++#endif
+ };
+ 
+ /**
+@@ -91,6 +99,11 @@
+         const char *value;
+     } *resp_hdrs;                                   /*!< Additional headers in response packet */
+     struct http_parser_url url_parse_res;           /*!< URL parsing result, used for retrieving URL elements */
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++    bool ws_handshake_detect;                       /*!< WebSocket handshake detection flag */
++    httpd_ws_type_t ws_type;                        /*!< WebSocket frame type */
++    bool ws_final;                                  /*!< WebSocket FIN bit (final frame or not) */
++#endif
+ };
+ 
+ /**
+@@ -471,6 +484,45 @@
+  * @}
+  */
+ 
++/* ************** Group: WebSocket ************** */
++/** @name WebSocket
++ * Functions for WebSocket header parsing
++ * @{
++ */
++
++
++/**
++ * @brief   This function is for responding a WebSocket handshake
++ *
++ * @param[in] req                       Pointer to handshake request that will be handled
++ * @param[in] supported_subprotocol     Pointer to the subprotocol supported by this URI
++ * @return
++ *  - ESP_OK                        : When handshake is sucessful
++ *  - ESP_ERR_NOT_FOUND             : When some headers (Sec-WebSocket-*) are not found
++ *  - ESP_ERR_INVALID_VERSION       : The WebSocket version is not "13"
++ *  - ESP_ERR_INVALID_STATE         : Handshake was done beforehand
++ *  - ESP_ERR_INVALID_ARG           : Argument is invalid (null or non-WebSocket)
++ *  - ESP_FAIL                      : Socket failures
++ */
++esp_err_t httpd_ws_respond_server_handshake(httpd_req_t *req, const char *supported_subprotocol);
++
++/**
++ * @brief   This function is for getting a frame type
++ *          and responding a WebSocket control frame automatically
++ *
++ * @param[in] req    Pointer to handshake request that will be handled
++ * @return
++ *  - ESP_OK                        : When handshake is sucessful
++ *  - ESP_ERR_INVALID_ARG           : Argument is invalid (null or non-WebSocket)
++ *  - ESP_ERR_INVALID_STATE         : Received only some parts of a control frame
++ *  - ESP_FAIL                      : Socket failures
++ */
++esp_err_t httpd_ws_get_frame_type(httpd_req_t *req);
++
++/** End of WebSocket related functions
++ * @}
++ */
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff -Naur orig/components/esp_http_server/src/httpd_main.c new/components/esp_http_server/src/httpd_main.c
+--- orig/components/esp_http_server/src/httpd_main.c	2021-03-19 13:09:06.061072019 +0100
++++ new/components/esp_http_server/src/httpd_main.c	2021-02-09 17:22:51.000000000 +0100
+@@ -102,6 +102,26 @@
+     return ESP_OK;
+ }
+ 
++esp_err_t httpd_get_client_list(httpd_handle_t handle, size_t *fds, int *client_fds)
++{
++    struct httpd_data *hd = (struct httpd_data *) handle;
++    if (hd == NULL || fds == NULL || *fds == 0 || client_fds == NULL || *fds < hd->config.max_open_sockets) {
++        return ESP_ERR_INVALID_ARG;
++    }
++    size_t max_fds = *fds;
++    *fds = 0;
++    for (int i = 0; i < hd->config.max_open_sockets; ++i) {
++        if (hd->hd_sd[i].fd != -1) {
++            if (*fds < max_fds) {
++                client_fds[(*fds)++] = hd->hd_sd[i].fd;
++            } else {
++                return ESP_ERR_INVALID_ARG;
++            }
++        }
++    }
++    return ESP_OK;
++}
++
+ void *httpd_get_global_user_ctx(httpd_handle_t handle)
+ {
+     return ((struct httpd_data *)handle)->config.global_user_ctx;
+diff -Naur orig/components/esp_http_server/src/httpd_parse.c new/components/esp_http_server/src/httpd_parse.c
+--- orig/components/esp_http_server/src/httpd_parse.c	2021-03-19 13:09:06.061072019 +0100
++++ new/components/esp_http_server/src/httpd_parse.c	2021-03-04 14:44:57.631173271 +0100
+@@ -374,13 +374,36 @@
+     ESP_LOGD(TAG, LOG_FMT("bytes read     = %d"),  parser->nread);
+     ESP_LOGD(TAG, LOG_FMT("content length = %zu"), r->content_len);
+ 
++    /* Handle upgrade requests - only WebSocket is supported for now */
+     if (parser->upgrade) {
+-        ESP_LOGW(TAG, LOG_FMT("upgrade from HTTP not supported"));
+-        /* There is no specific HTTP error code to notify the client that
+-         * upgrade is not supported, thus sending 400 Bad Request */
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++        ESP_LOGD(TAG, LOG_FMT("Got an upgrade request"));
++
++        /* If there's no "Upgrade" header field, then it's not WebSocket. */
++        char ws_upgrade_hdr_val[] = "websocket";
++        if (httpd_req_get_hdr_value_str(r, "Upgrade", ws_upgrade_hdr_val, sizeof(ws_upgrade_hdr_val)) != ESP_OK) {
++            ESP_LOGW(TAG, LOG_FMT("Upgrade header does not match the length of \"websocket\""));
++            parser_data->error = HTTPD_400_BAD_REQUEST;
++            parser_data->status = PARSING_FAILED;
++            return ESP_FAIL;
++        }
++
++        /* If "Upgrade" field's key is not "websocket", then we should also forget about it. */
++        if (strcasecmp("websocket", ws_upgrade_hdr_val) != 0) {
++            ESP_LOGW(TAG, LOG_FMT("Upgrade header found but it's %s"), ws_upgrade_hdr_val);
++            parser_data->error = HTTPD_400_BAD_REQUEST;
++            parser_data->status = PARSING_FAILED;
++            return ESP_FAIL;
++        }
++
++        /* Now set handshake flag to true */
++        ra->ws_handshake_detect = true;
++#else
++        ESP_LOGD(TAG, LOG_FMT("WS functions has been disabled, Upgrade request is not supported."));
+         parser_data->error = HTTPD_400_BAD_REQUEST;
+         parser_data->status = PARSING_FAILED;
+         return ESP_FAIL;
++#endif
+     }
+ 
+     parser_data->status = PARSING_BODY;
+@@ -667,6 +690,9 @@
+     ra->first_chunk_sent = 0;
+     ra->req_hdrs_count = 0;
+     ra->resp_hdrs_count = 0;
++#if CONFIG_HTTPD_WS_SUPPORT
++    ra->ws_handshake_detect = false;
++#endif
+     memset(ra->resp_hdrs, 0, config->max_resp_headers * sizeof(struct resp_hdr));
+ }
+ 
+@@ -678,6 +704,15 @@
+     if ((r->ignore_sess_ctx_changes == false) && (ra->sd->ctx != r->sess_ctx)) {
+         httpd_sess_free_ctx(ra->sd->ctx, ra->sd->free_ctx);
+     }
++
++#if CONFIG_HTTPD_WS_SUPPORT
++    /* Close the socket when a WebSocket Close request is received */
++    if (ra->sd->ws_close) {
++        ESP_LOGD(TAG, LOG_FMT("Try closing WS connection at FD: %d"), ra->sd->fd);
++        httpd_sess_trigger_close(r->handle, ra->sd->fd);
++    }
++#endif
++
+     /* Retrieve session info from the request into the socket database. */
+     ra->sd->ctx = r->sess_ctx;
+     ra->sd->free_ctx = r->free_ctx;
+@@ -687,6 +722,7 @@
+     ra->sd = NULL;
+     r->handle = NULL;
+     r->aux = NULL;
++    r->user_ctx = NULL;
+ }
+ 
+ /* Function that processes incoming TCP data and
+@@ -699,23 +735,65 @@
+     init_req_aux(&hd->hd_req_aux, &hd->config);
+     r->handle = hd;
+     r->aux = &hd->hd_req_aux;
++
+     /* Associate the request to the socket */
+     struct httpd_req_aux *ra = r->aux;
+     ra->sd = sd;
++
+     /* Set defaults */
+     ra->status = (char *)HTTPD_200;
+     ra->content_type = (char *)HTTPD_TYPE_TEXT;
+     ra->first_chunk_sent = false;
++
+     /* Copy session info to the request */
+     r->sess_ctx = sd->ctx;
+     r->free_ctx = sd->free_ctx;
+     r->ignore_sess_ctx_changes = sd->ignore_sess_ctx_changes;
++
++    esp_err_t ret;
++
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++    /* Copy user_ctx to the request */
++    r->user_ctx = sd->ws_user_ctx;
++    /* Handle WebSocket */
++    ESP_LOGD(TAG, LOG_FMT("New request, has WS? %s, sd->ws_handler valid? %s, sd->ws_close? %s"),
++             sd->ws_handshake_done ? "Yes" : "No",
++             sd->ws_handler != NULL ? "Yes" : "No",
++             sd->ws_close ? "Yes" : "No");
++    if (sd->ws_handshake_done && sd->ws_handler != NULL) {
++        ret = httpd_ws_get_frame_type(r);
++        ESP_LOGD(TAG, LOG_FMT("New WS request from existing socket, ws_type=%d"), ra->ws_type);
++
++        /*  Stop and return here immediately if it's a CLOSE frame */
++        if (ra->ws_type == HTTPD_WS_TYPE_CLOSE) {
++            sd->ws_close = true;
++            return ret;
++        }
++
++        if (ra->ws_type == HTTPD_WS_TYPE_PONG) {
++            /* Pass the PONG frames to the handler as well, as user app might send PINGs */
++            ESP_LOGD(TAG, LOG_FMT("Received PONG frame"));
++        }
++
++        /* Call handler if it's a non-control frame (or if handler requests control frames, as well) */
++        if (ret == ESP_OK &&
++            (ra->ws_type < HTTPD_WS_TYPE_CLOSE || sd->ws_control_frames)) {
++            ret = sd->ws_handler(r);
++        }
++
++        if (ret != ESP_OK) {
++            httpd_req_cleanup(r);
++        }
++        return ret;
++    }
++#endif
++
+     /* Parse request */
+-    esp_err_t err = httpd_parse_req(hd);
+-    if (err != ESP_OK) {
++    ret = httpd_parse_req(hd);
++    if (ret != ESP_OK) {
+         httpd_req_cleanup(r);
+     }
+-    return err;
++    return ret;
+ }
+ 
+ /* Function that resets the http request data
+diff -Naur orig/components/esp_http_server/src/httpd_sess.c new/components/esp_http_server/src/httpd_sess.c
+--- orig/components/esp_http_server/src/httpd_sess.c	2021-03-19 13:09:06.065072076 +0100
++++ new/components/esp_http_server/src/httpd_sess.c	2021-02-09 17:23:09.000000000 +0100
+@@ -199,10 +199,10 @@
+     return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
+ }
+ 
+-static inline uint64_t httpd_sess_get_lru_counter()
++static inline uint64_t httpd_sess_get_lru_counter(void)
+ {
+     static uint64_t lru_counter = 0;
+-    return lru_counter++;
++    return ++lru_counter;
+ }
+ 
+ void httpd_sess_delete_invalid(struct httpd_data *hd)
+@@ -281,7 +281,9 @@
+     if (sd->pending_fn) {
+         // test if there's any data to be read (besides read() function, which is handled by select() in the main httpd loop)
+         // this should check e.g. for the SSL data buffer
+-        if (sd->pending_fn(hd, fd) > 0) return true;
++        if (sd->pending_fn(hd, fd) > 0) {
++            return true;
++        }
+     }
+ 
+     return (sd->pending_len != 0);
+@@ -348,6 +350,8 @@
+         }
+     }
+     ESP_LOGD(TAG, LOG_FMT("fd = %d"), lru_fd);
++    struct sock_db *sd = httpd_sess_get(hd, lru_fd);
++    sd->lru_socket = true;
+     return httpd_sess_trigger_close(hd, lru_fd);
+ }
+ 
+@@ -378,11 +382,12 @@
+ {
+     struct sock_db *sock_db = (struct sock_db *)arg;
+     if (sock_db) {
+-        if (sock_db->lru_counter == 0) {
++        if (sock_db->lru_counter == 0 && !sock_db->lru_socket) {
+             ESP_LOGD(TAG, "Skipping session close for %d as it seems to be a race condition", sock_db->fd);
+             return;
+         }
+         int fd = sock_db->fd;
++        sock_db->lru_socket = false;
+         struct httpd_data *hd = (struct httpd_data *) sock_db->handle;
+         httpd_sess_delete(hd, fd);
+         close(fd);
+diff -Naur orig/components/esp_http_server/src/httpd_txrx.c new/components/esp_http_server/src/httpd_txrx.c
+--- orig/components/esp_http_server/src/httpd_txrx.c	2021-03-19 13:09:06.065072076 +0100
++++ new/components/esp_http_server/src/httpd_txrx.c	2021-02-09 17:23:14.000000000 +0100
+@@ -399,6 +399,14 @@
+             status = "400 Bad Request";
+             msg    = "Server unable to understand request due to invalid syntax";
+             break;
++        case HTTPD_401_UNAUTHORIZED:
++            status = "401 Unauthorized";
++            msg    = "Server known the client's identify and it must authenticate itself to get he requested response";
++            break;
++        case HTTPD_403_FORBIDDEN:
++            status = "403 Forbidden";
++            msg    = "Server is refusing to give the requested resource to the client";
++            break;
+         case HTTPD_404_NOT_FOUND:
+             status = "404 Not Found";
+             msg    = "This URI does not exist";
+@@ -451,7 +459,7 @@
+ #endif
+ 
+     /* Send HTTP error message */
+-    ret = httpd_resp_send(req, msg, strlen(msg));
++    ret = httpd_resp_send(req, msg, HTTPD_RESP_USE_STRLEN);
+ 
+ #ifdef CONFIG_HTTPD_ERR_RESP_NO_DELAY
+     /* If TCP_NODELAY was set successfully above, time to disable it */
+@@ -599,3 +607,27 @@
+     }
+     return ret;
+ }
++
++int httpd_socket_send(httpd_handle_t hd, int sockfd, const char *buf, size_t buf_len, int flags)
++{
++    struct sock_db *sess = httpd_sess_get(hd, sockfd);
++    if (!sess) {
++        return ESP_ERR_INVALID_ARG;
++    }
++    if (!sess->send_fn) {
++        return ESP_ERR_INVALID_STATE;
++    }
++    return sess->send_fn(hd, sockfd, buf, buf_len, flags);
++}
++
++int httpd_socket_recv(httpd_handle_t hd, int sockfd, char *buf, size_t buf_len, int flags)
++{
++    struct sock_db *sess = httpd_sess_get(hd, sockfd);
++    if (!sess) {
++        return ESP_ERR_INVALID_ARG;
++    }
++    if (!sess->recv_fn) {
++        return ESP_ERR_INVALID_STATE;
++    }
++    return sess->recv_fn(hd, sockfd, buf, buf_len, flags);
++}
+diff -Naur orig/components/esp_http_server/src/httpd_uri.c new/components/esp_http_server/src/httpd_uri.c
+--- orig/components/esp_http_server/src/httpd_uri.c	2021-03-19 13:09:06.065072076 +0100
++++ new/components/esp_http_server/src/httpd_uri.c	2021-03-04 14:44:57.631173271 +0100
+@@ -172,6 +172,15 @@
+             hd->hd_calls[i]->method   = uri_handler->method;
+             hd->hd_calls[i]->handler  = uri_handler->handler;
+             hd->hd_calls[i]->user_ctx = uri_handler->user_ctx;
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++            hd->hd_calls[i]->is_websocket = uri_handler->is_websocket;
++            hd->hd_calls[i]->handle_ws_control_frames = uri_handler->handle_ws_control_frames;
++            if (uri_handler->supported_subprotocol) {
++                hd->hd_calls[i]->supported_subprotocol = strdup(uri_handler->supported_subprotocol);
++            } else {
++                hd->hd_calls[i]->supported_subprotocol = NULL;
++            }
++#endif
+             ESP_LOGD(TAG, LOG_FMT("[%d] installed %s"), i, uri_handler->uri);
+             return ESP_OK;
+         }
+@@ -307,6 +316,26 @@
+     /* Attach user context data (passed during URI registration) into request */
+     req->user_ctx = uri->user_ctx;
+ 
++    /* Final step for a WebSocket handshake verification */
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++    struct httpd_req_aux   *aux = req->aux;
++    if (uri->is_websocket && aux->ws_handshake_detect && uri->method == HTTP_GET) {
++        ESP_LOGD(TAG, LOG_FMT("Responding WS handshake to sock %d"), aux->sd->fd);
++        esp_err_t ret = httpd_ws_respond_server_handshake(&hd->hd_req, uri->supported_subprotocol);
++        if (ret != ESP_OK) {
++            return ret;
++        }
++
++        aux->sd->ws_handshake_done = true;
++        aux->sd->ws_handler = uri->handler;
++        aux->sd->ws_control_frames = uri->handle_ws_control_frames;
++        aux->sd->ws_user_ctx = uri->user_ctx;
++
++        /* Return immediately after handshake, no need to call handler here */
++        return ESP_OK;
++    }
++#endif
++
+     /* Invoke handler */
+     if (uri->handler(req) != ESP_OK) {
+         /* Handler returns error, this socket should be closed */
+diff -Naur orig/components/esp_http_server/src/httpd_ws.c new/components/esp_http_server/src/httpd_ws.c
+--- orig/components/esp_http_server/src/httpd_ws.c	1970-01-01 01:00:00.000000000 +0100
++++ new/components/esp_http_server/src/httpd_ws.c	2021-02-09 17:23:36.000000000 +0100
+@@ -0,0 +1,481 @@
++// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++
++
++#include <stdlib.h>
++#include <string.h>
++#include <sys/random.h>
++#include <esp_log.h>
++#include <esp_err.h>
++#include <mbedtls/sha1.h>
++#include <mbedtls/base64.h>
++
++#include <esp_http_server.h>
++#include "esp_httpd_priv.h"
++
++#ifdef CONFIG_HTTPD_WS_SUPPORT
++
++static const char *TAG="httpd_ws";
++
++/*
++ * Bit masks for WebSocket frames.
++ * Please refer to RFC6455 Section 5.2 for more details.
++ */
++#define HTTPD_WS_CONTINUE       0x00U
++#define HTTPD_WS_FIN_BIT        0x80U
++#define HTTPD_WS_OPCODE_BITS    0x0fU
++#define HTTPD_WS_MASK_BIT       0x80U
++#define HTTPD_WS_LENGTH_BITS    0x7fU
++
++/*
++ * The magic GUID string used for handshake
++ * Please refer to RFC6455 Section 1.3 for more details.
++ */
++static const char ws_magic_uuid[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
++
++/* Checks if any subprotocols from the comma seperated list matches the supported one
++ *
++ * Returns true if the response should contain a protocol field
++*/
++
++/**
++ * @brief Checks if any subprotocols from the comma seperated list matches the supported one
++ *
++ * @param supported_subprotocol[in] The subprotocol supported by the URI
++ * @param subprotocol[in],  [in]: A comma seperate list of subprotocols requested
++ * @param buf_len Length of the buffer
++ * @return true: found a matching subprotocol
++ * @return false
++ */
++static bool httpd_ws_get_response_subprotocol(const char *supported_subprotocol, char *subprotocol, size_t buf_len)
++{
++    /* Request didnt contain any subprotocols */
++    if (strnlen(subprotocol, buf_len) == 0) {
++        return false;
++    }
++
++    if (supported_subprotocol == NULL) {
++        ESP_LOGW(TAG, "Sec-WebSocket-Protocol %s not supported, URI do not support any subprotocols", subprotocol);
++        return false;
++    }
++
++    /* Get first subprotocol from comma seperated list */
++    char *rest = NULL;
++    char *s = strtok_r(subprotocol, ", ", &rest);
++    do {
++        if (strncmp(s, supported_subprotocol, sizeof(subprotocol)) == 0) {
++            ESP_LOGD(TAG, "Requested subprotocol supported: %s", s);
++            return true;
++        }
++    } while ((s = strtok_r(NULL, ", ", &rest)) != NULL);
++
++    ESP_LOGW(TAG, "Sec-WebSocket-Protocol %s not supported, supported subprotocol is %s", subprotocol, supported_subprotocol);
++
++    /* No matches */
++    return false;
++
++}
++
++esp_err_t httpd_ws_respond_server_handshake(httpd_req_t *req, const char *supported_subprotocol)
++{
++    /* Probe if input parameters are valid or not */
++    if (!req || !req->aux) {
++        ESP_LOGW(TAG, LOG_FMT("Argument is invalid"));
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    /* Detect handshake - reject if handshake was ALREADY performed */
++    struct httpd_req_aux *req_aux = req->aux;
++    if (req_aux->sd->ws_handshake_done) {
++        ESP_LOGW(TAG, LOG_FMT("State is invalid - Handshake has been performed"));
++        return ESP_ERR_INVALID_STATE;
++    }
++
++    /* Detect WS version existence */
++    char version_val[3] = { '\0' };
++    if (httpd_req_get_hdr_value_str(req, "Sec-WebSocket-Version", version_val, sizeof(version_val)) != ESP_OK) {
++        ESP_LOGW(TAG, LOG_FMT("\"Sec-WebSocket-Version\" is not found"));
++        return ESP_ERR_NOT_FOUND;
++    }
++
++    /* Detect if WS version is "13" or not.
++     * WS version must be 13 for now. Please refer to RFC6455 Section 4.1, Page 18 for more details. */
++    if (strcasecmp(version_val, "13") != 0) {
++        ESP_LOGW(TAG, LOG_FMT("\"Sec-WebSocket-Version\" is not \"13\", it is: %s"), version_val);
++        return ESP_ERR_INVALID_VERSION;
++    }
++
++    /* Grab Sec-WebSocket-Key (client key) from the header */
++    /* Size of base64 coded string is equal '((input_size * 4) / 3) + (input_size / 96) + 6' including Z-term */
++    char sec_key_encoded[28] = { '\0' };
++    if (httpd_req_get_hdr_value_str(req, "Sec-WebSocket-Key", sec_key_encoded, sizeof(sec_key_encoded)) != ESP_OK) {
++        ESP_LOGW(TAG, LOG_FMT("Cannot find client key"));
++        return ESP_ERR_NOT_FOUND;
++    }
++
++    /* Prepare server key (Sec-WebSocket-Accept), concat the string */
++    char server_key_encoded[33] = { '\0' };
++    uint8_t server_key_hash[20] = { 0 };
++    char server_raw_text[sizeof(sec_key_encoded) + sizeof(ws_magic_uuid) + 1] = { '\0' };
++
++    strcpy(server_raw_text, sec_key_encoded);
++    strcat(server_raw_text, ws_magic_uuid);
++
++    ESP_LOGD(TAG, LOG_FMT("Server key before encoding: %s"), server_raw_text);
++
++    /* Generate SHA-1 first and then encode to Base64 */
++    size_t key_len = strlen(server_raw_text);
++    mbedtls_sha1_ret((uint8_t *)server_raw_text, key_len, server_key_hash);
++
++    size_t encoded_len = 0;
++    mbedtls_base64_encode((uint8_t *)server_key_encoded, sizeof(server_key_encoded), &encoded_len,
++                          server_key_hash, sizeof(server_key_hash));
++
++    ESP_LOGD(TAG, LOG_FMT("Generated server key: %s"), server_key_encoded);
++
++    char subprotocol[50] = { '\0' };
++    if (httpd_req_get_hdr_value_str(req, "Sec-WebSocket-Protocol", subprotocol, sizeof(subprotocol) - 1) == ESP_ERR_HTTPD_RESULT_TRUNC) {
++        ESP_LOGW(TAG, "Sec-WebSocket-Protocol length exceeded buffer size of %d, was trunctated", sizeof(subprotocol));
++    }
++
++
++    /* Prepare the Switching Protocol response */
++    char tx_buf[192] = { '\0' };
++    int fmt_len = snprintf(tx_buf, sizeof(tx_buf),
++                           "HTTP/1.1 101 Switching Protocols\r\n"
++                           "Upgrade: websocket\r\n"
++                           "Connection: Upgrade\r\n"
++                           "Sec-WebSocket-Accept: %s\r\n", server_key_encoded);
++
++    if (fmt_len < 0 || fmt_len > sizeof(tx_buf)) {
++        ESP_LOGW(TAG, LOG_FMT("Failed to prepare Tx buffer"));
++        return ESP_FAIL;
++    }
++
++    if ( httpd_ws_get_response_subprotocol(supported_subprotocol, subprotocol, sizeof(subprotocol))) {
++        ESP_LOGD(TAG, "subprotocol: %s", subprotocol);
++        int r = snprintf(tx_buf + fmt_len, sizeof(tx_buf) - fmt_len, "Sec-WebSocket-Protocol: %s\r\n", supported_subprotocol);
++        if (r <= 0) {
++            ESP_LOGE(TAG, "Error in response generation"
++                          "(snprintf of subprotocol returned %d, buffer size: %d", r, sizeof(tx_buf));
++            return ESP_FAIL;
++        }
++
++        fmt_len += r;
++
++        if (fmt_len >= sizeof(tx_buf)) {
++            ESP_LOGE(TAG, "Error in response generation"
++                          "(snprintf of subprotocol returned %d, desired response len: %d, buffer size: %d", r, fmt_len, sizeof(tx_buf));
++            return ESP_FAIL;
++        }
++    }
++
++    int r = snprintf(tx_buf + fmt_len, sizeof(tx_buf) - fmt_len, "\r\n");
++    if (r <= 0) {
++        ESP_LOGE(TAG, "Error in response generation"
++                        "(snprintf of subprotocol returned %d, buffer size: %d", r, sizeof(tx_buf));
++        return ESP_FAIL;
++    }
++    fmt_len += r;
++    if (fmt_len >= sizeof(tx_buf)) {
++        ESP_LOGE(TAG, "Error in response generation"
++                       "(snprintf of header terminal returned %d, desired response len: %d, buffer size: %d", r, fmt_len, sizeof(tx_buf));
++        return ESP_FAIL;
++    }
++
++    /* Send off the response */
++    if (httpd_send(req, tx_buf, fmt_len) < 0) {
++        ESP_LOGW(TAG, LOG_FMT("Failed to send the response"));
++        return ESP_FAIL;
++    }
++
++    return ESP_OK;
++}
++
++static esp_err_t httpd_ws_check_req(httpd_req_t *req)
++{
++    /* Probe if input parameters are valid or not */
++    if (!req || !req->aux) {
++        ESP_LOGW(TAG, LOG_FMT("Argument is null"));
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    /* Detect handshake - reject if handshake was NOT YET performed */
++    struct httpd_req_aux *req_aux = req->aux;
++    if (!req_aux->sd->ws_handshake_done) {
++        ESP_LOGW(TAG, LOG_FMT("State is invalid - No handshake performed"));
++        return ESP_ERR_INVALID_STATE;
++    }
++
++    return ESP_OK;
++}
++
++static esp_err_t httpd_ws_unmask_payload(uint8_t *payload, size_t len, const uint8_t *mask_key)
++{
++    if (len < 1 || !payload) {
++        ESP_LOGW(TAG, LOG_FMT("Invalid payload provided"));
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    for (size_t idx = 0; idx < len; idx++) {
++        payload[idx] = (payload[idx] ^ mask_key[idx % 4]);
++    }
++
++    return ESP_OK;
++}
++
++esp_err_t httpd_ws_recv_frame(httpd_req_t *req, httpd_ws_frame_t *frame, size_t max_len)
++{
++    esp_err_t ret = httpd_ws_check_req(req);
++    if (ret != ESP_OK) {
++        return ret;
++    }
++
++    struct httpd_req_aux *aux = req->aux;
++    if (aux == NULL) {
++        ESP_LOGW(TAG, LOG_FMT("Invalid Aux pointer"));
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    if (!frame) {
++        ESP_LOGW(TAG, LOG_FMT("Frame pointer is invalid"));
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    /* Assign the frame info from the previous reading */
++    frame->type = aux->ws_type;
++    frame->final = aux->ws_final;
++
++    /* Grab the second byte */
++    uint8_t second_byte = 0;
++    if (httpd_recv_with_opt(req, (char *)&second_byte, sizeof(second_byte), false) <= 0) {
++        ESP_LOGW(TAG, LOG_FMT("Failed to receive the second byte"));
++        return ESP_FAIL;
++    }
++
++    /* Parse the second byte */
++    /* Please refer to RFC6455 Section 5.2 for more details */
++    bool masked = (second_byte & HTTPD_WS_MASK_BIT) != 0;
++
++    /* Interpret length */
++    uint8_t init_len = second_byte & HTTPD_WS_LENGTH_BITS;
++    if (init_len < 126) {
++        /* Case 1: If length is 0-125, then this length bit is 7 bits */
++        frame->len = init_len;
++    } else if (init_len == 126) {
++        /* Case 2: If length byte is 126, then this frame's length bit is 16 bits */
++        uint8_t length_bytes[2] = { 0 };
++        if (httpd_recv_with_opt(req, (char *)length_bytes, sizeof(length_bytes), false) <= 0) {
++            ESP_LOGW(TAG, LOG_FMT("Failed to receive 2 bytes length"));
++            return ESP_FAIL;
++        }
++
++        frame->len = ((uint32_t)(length_bytes[0] << 8U) | (length_bytes[1]));
++    } else if (init_len == 127) {
++        /* Case 3: If length is byte 127, then this frame's length bit is 64 bits */
++        uint8_t length_bytes[8] = { 0 };
++        if (httpd_recv_with_opt(req, (char *)length_bytes, sizeof(length_bytes), false) <= 0) {
++            ESP_LOGW(TAG, LOG_FMT("Failed to receive 2 bytes length"));
++            return ESP_FAIL;
++        }
++
++        frame->len = (((uint64_t)length_bytes[0] << 56U) |
++                    ((uint64_t)length_bytes[1] << 48U) |
++                    ((uint64_t)length_bytes[2] << 40U) |
++                    ((uint64_t)length_bytes[3] << 32U) |
++                    ((uint64_t)length_bytes[4] << 24U) |
++                    ((uint64_t)length_bytes[5] << 16U) |
++                    ((uint64_t)length_bytes[6] <<  8U) |
++                    ((uint64_t)length_bytes[7]));
++    }
++
++    /* We only accept the incoming packet length that is smaller than the max_len (or it will overflow the buffer!) */
++    if (frame->len > max_len) {
++        ESP_LOGW(TAG, LOG_FMT("WS Message too long"));
++        return ESP_ERR_INVALID_SIZE;
++    }
++
++    /* If this frame is masked, dump the mask as well */
++    uint8_t mask_key[4] = { 0 };
++    if (masked) {
++        if (httpd_recv_with_opt(req, (char *)mask_key, sizeof(mask_key), false) <= 0) {
++            ESP_LOGW(TAG, LOG_FMT("Failed to receive mask key"));
++            return ESP_FAIL;
++        }
++    } else {
++        /* If the WS frame from client to server is not masked, it should be rejected.
++         * Please refer to RFC6455 Section 5.2 for more details. */
++        ESP_LOGW(TAG, LOG_FMT("WS frame is not properly masked."));
++        return ESP_ERR_INVALID_STATE;
++    }
++
++    /* Receive buffer */
++    /* If there's nothing to receive, return and stop here. */
++    if (frame->len == 0) {
++        return ESP_OK;
++    }
++
++    if (frame->payload == NULL) {
++        ESP_LOGW(TAG, LOG_FMT("Payload buffer is null"));
++        return ESP_FAIL;
++    }
++
++    if (httpd_recv_with_opt(req, (char *)frame->payload, frame->len, false) <= 0) {
++        ESP_LOGW(TAG, LOG_FMT("Failed to receive payload"));
++        return ESP_FAIL;
++    }
++
++    /* Unmask payload */
++    httpd_ws_unmask_payload(frame->payload, frame->len, mask_key);
++
++    return ESP_OK;
++}
++
++esp_err_t httpd_ws_send_frame(httpd_req_t *req, httpd_ws_frame_t *frame)
++{
++    esp_err_t ret = httpd_ws_check_req(req);
++    if (ret != ESP_OK) {
++        return ret;
++    }
++    return httpd_ws_send_frame_async(req->handle, httpd_req_to_sockfd(req), frame);
++}
++
++esp_err_t httpd_ws_send_frame_async(httpd_handle_t hd, int fd, httpd_ws_frame_t *frame)
++{
++    if (!frame) {
++        ESP_LOGW(TAG, LOG_FMT("Argument is invalid"));
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    /* Prepare Tx buffer - maximum length is 14, which includes 2 bytes header, 8 bytes length, 4 bytes mask key */
++    uint8_t tx_len = 0;
++    uint8_t header_buf[10] = {0 };
++    /* Set the `FIN` bit by default if message is not fragmented. Else, set it as per the `final` field */
++    header_buf[0] |= (!frame->fragmented) ? HTTPD_WS_FIN_BIT : (frame->final? HTTPD_WS_FIN_BIT: HTTPD_WS_CONTINUE);
++    header_buf[0] |= frame->type; /* Type (opcode): 4 bits */
++
++    if (frame->len <= 125) {
++        header_buf[1] = frame->len & 0x7fU; /* Length for 7 bits */
++        tx_len = 2;
++    } else if (frame->len > 125 && frame->len < UINT16_MAX) {
++        header_buf[1] = 126;                /* Length for 16 bits */
++        header_buf[2] = (frame->len >> 8U) & 0xffU;
++        header_buf[3] = frame->len & 0xffU;
++        tx_len = 4;
++    } else {
++        header_buf[1] = 127;                /* Length for 64 bits */
++        uint8_t shift_idx = sizeof(uint64_t) - 1; /* Shift index starts at 7 */
++        uint64_t len64 = frame->len; /* Raise variable size to make sure we won't shift by more bits
++                                      * than the length has (to avoid undefined behaviour) */
++        for (int8_t idx = 2; idx <= 9; idx++) {
++            /* Now do shifting (be careful of endianness, i.e. when buffer index is 2, frame length shift index is 7) */
++            header_buf[idx] = (len64 >> (shift_idx * 8)) & 0xffU;
++            shift_idx--;
++        }
++        tx_len = 10;
++    }
++
++    /* WebSocket server does not required to mask response payload, so leave the MASK bit as 0. */
++    header_buf[1] &= (~HTTPD_WS_MASK_BIT);
++
++    struct sock_db *sess = httpd_sess_get(hd, fd);
++    if (!sess) {
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    /* Send off header */
++    if (sess->send_fn(hd, fd, (const char *)header_buf, tx_len, 0) < 0) {
++        ESP_LOGW(TAG, LOG_FMT("Failed to send WS header"));
++        return ESP_FAIL;
++    }
++
++    /* Send off payload */
++    if(frame->len > 0 && frame->payload != NULL) {
++        if (sess->send_fn(hd, fd, (const char *)frame->payload, frame->len, 0) < 0) {
++            ESP_LOGW(TAG, LOG_FMT("Failed to send WS payload"));
++            return ESP_FAIL;
++        }
++    }
++
++    return ESP_OK;
++}
++
++esp_err_t httpd_ws_get_frame_type(httpd_req_t *req)
++{
++    esp_err_t ret = httpd_ws_check_req(req);
++    if (ret != ESP_OK) {
++        return ret;
++    }
++
++    struct httpd_req_aux *aux = req->aux;
++    if (aux == NULL) {
++        ESP_LOGW(TAG, LOG_FMT("Invalid Aux pointer"));
++        return ESP_ERR_INVALID_ARG;
++    }
++
++    /* Read the first byte from the frame to get the FIN flag and Opcode */
++    /* Please refer to RFC6455 Section 5.2 for more details */
++    uint8_t first_byte = 0;
++    if (httpd_recv_with_opt(req, (char *)&first_byte, sizeof(first_byte), false) <= 0) {
++        /* If the recv() return code is <= 0, then this socket FD is invalid (i.e. a broken connection) */
++        /* Here we mark it as a Close message and close it later. */
++        ESP_LOGW(TAG, LOG_FMT("Failed to read header byte (socket FD invalid), closing socket now"));
++        aux->ws_final = true;
++        aux->ws_type = HTTPD_WS_TYPE_CLOSE;
++        return ESP_OK;
++    }
++
++    ESP_LOGD(TAG, LOG_FMT("First byte received: 0x%02X"), first_byte);
++
++    /* Decode the FIN flag and Opcode from the byte */
++    aux->ws_final = (first_byte & HTTPD_WS_FIN_BIT) != 0;
++    aux->ws_type = (first_byte & HTTPD_WS_OPCODE_BITS);
++
++    /* Reply to PING. For PONG and CLOSE, it will be handled elsewhere. */
++    if(aux->ws_type == HTTPD_WS_TYPE_PING) {
++        ESP_LOGD(TAG, LOG_FMT("Got a WS PING frame, Replying PONG..."));
++
++        /* Read the rest of the PING frame, for PONG to reply back. */
++        /* Please refer to RFC6455 Section 5.5.2 for more details */
++        httpd_ws_frame_t frame;
++        uint8_t frame_buf[128] = { 0 };
++        memset(&frame, 0, sizeof(httpd_ws_frame_t));
++        frame.payload = frame_buf;
++
++        if(httpd_ws_recv_frame(req, &frame, 126) != ESP_OK) {
++            ESP_LOGD(TAG, LOG_FMT("Cannot receive the full PING frame"));
++            return ESP_ERR_INVALID_STATE;
++        }
++
++        /* Now turn the frame to PONG */
++        frame.type = HTTPD_WS_TYPE_PONG;
++        return httpd_ws_send_frame(req, &frame);
++    }
++
++    return ESP_OK;
++}
++
++httpd_ws_client_info_t httpd_ws_get_fd_info(httpd_handle_t hd, int fd)
++{
++    struct sock_db *sess = httpd_sess_get(hd, fd);
++
++    if (sess == NULL) {
++        return HTTPD_WS_CLIENT_INVALID;
++    }
++    bool is_active_ws = sess->ws_handshake_done && (!sess->ws_close);
++    return is_active_ws ? HTTPD_WS_CLIENT_WEBSOCKET : HTTPD_WS_CLIENT_HTTP;
++}
++
++#endif /* CONFIG_HTTPD_WS_SUPPORT */
+diff -Naur orig/components/esp_http_server/src/port/esp32/osal.h new/components/esp_http_server/src/port/esp32/osal.h
+--- orig/components/esp_http_server/src/port/esp32/osal.h	2021-03-19 13:09:06.065072076 +0100
++++ new/components/esp_http_server/src/port/esp32/osal.h	2021-02-09 17:24:31.000000000 +0100
+@@ -43,7 +43,7 @@
+ }
+ 
+ /* Only self delete is supported */
+-static inline void httpd_os_thread_delete()
++static inline void httpd_os_thread_delete(void)
+ {
+     vTaskDelete(xTaskGetCurrentTaskHandle());
+ }
+@@ -53,7 +53,7 @@
+     vTaskDelay(msecs / portTICK_RATE_MS);
+ }
+ 
+-static inline othread_t httpd_os_thread_handle()
++static inline othread_t httpd_os_thread_handle(void)
+ {
+     return xTaskGetCurrentTaskHandle();
+ }

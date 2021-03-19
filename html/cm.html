@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ftDuino32 - Blockly</title>
+    <link rel="stylesheet" href="./picnic.min.css" />
+    <link rel="stylesheet" href="./style.css" />
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="./cm/codemirror.css">
+    <script src="./cm/codemirror.min.js"></script>
+    <script src="./cm/python.js"></script>
+    
+    <script src="./common.js"></script>
+    <script>
+      var editor;
+      
+      function init() {
+	  // initialize the codemirror editor
+	  editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+              mode: { name: "python",
+                      version: 3,
+                      singleLineStringErrors: false},
+              lineNumbers: true,
+	      indentWithTabs: true, // useful for python
+	      tabSize: 2,     // -"-
+              indentUnit: 2,  // to match blockly
+              matchBrackets: true
+	  });
+
+	  parseUrl("py", function(name, code) {
+	      // set project name in input field and set text into editor
+	      if(name) document.getElementById("project").value = name;
+	      if(code) editor.setValue(code);
+	      
+	      set_status(status.success, "CodeMirror " + CodeMirror.version);
+	  });
+      }
+
+      function upload() {
+	  var project = document.getElementById("project").value;
+	  if(!project) project = document.getElementById("project").placeholder;
+	  if(!project) {
+	      set_status(status.error, "No project name given");
+	      return;
+	  }
+	  var python_code = editor.getValue();
+	  post("python", [ { "filename": project+".py",  "data": python_code } ]);
+      }
+      
+      window.addEventListener('load', init);
+    </script>
+  </head>
+  
+  <body>
+    <nav>
+      <a href="index.html" class="brand">ftDuino32</a>
+      <input id="bmenub" type="checkbox" class="show">
+      <label for="bmenub" class="burger pseudo button">&#9776;</label>
+      
+      <div class="menu">
+	<label onclick="menu_hide(); toggle_fullscreen();" class="button">Fullscreen</label>
+	<div class="button" style="background-color: transparent; padding: 0;">
+	  <input id="project" size="10" placeholder="myproject" style="margin: 0; width: calc(100% - 5em - 5px)" onchange="input_filename_limit('project');" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();">
+	  <label onclick="menu_hide(); upload();" class="button" style="margin: 0; align: right; width:5em">Save</label>
+	</div>
+      </div>
+    </nav>
+    <div class="navbg"></div>
+
+    <textarea class="main" id="code" name="code"></textarea>
+    <div id="status"></div>
+  </body>
+</html>
