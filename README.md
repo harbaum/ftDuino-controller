@@ -38,11 +38,38 @@ In the current state of the firmware it allows the user to:
 
 ## Get it running
 
-To run the ftDuino32 setup you need:
+The final device is planned to be sold fully assembled. But you can
+run it on off-the-shelf breadboard components.
+
+To run the ftDuino32 setup this way you need:
 
 - ESP32 Wrover with PSRAM
 - ILI9341 based 240*320 touch TFT
 - SD card slot + SD card
+
+The required wiring (VCC/GND is shared by the touch):
+
+| ESP32 | TFT | TOUCH | SD card |
+|-------|---|---|---|
+| 3V3 | VCC | | VDD |
+| GND | GND | | VSS |
+| 5 | CS | | |
+| 27 | RESET | | |
+| 32 | DC | | |
+| 23 | SDI(MOSI) | T_DIN | |
+| 18 | SCK | T_CLK| |
+| 2 | LED green | | |
+| 4 | LED yellow | | |
+| 23 | SDO(MISO) | T_DO | |
+| 26 | | T_CS | |
+| 34 | | T_IRQ | |
+| 15 | | | CD_DAT3_CS |
+| 13 | | | CMD_DIN |
+| 14 | | | CLK |
+| 12 | | | DAT0_DO |
+| 15 | | | CD (optional) |
+
+Optional speaker on GPIO25.
 
 - Micropython with LVGL support
 - ESP-IDF 4.0
