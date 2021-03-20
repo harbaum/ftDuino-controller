@@ -67,7 +67,7 @@ The required wiring (VCC/GND is shared by the touch):
 | 13 | | | CMD_DIN |
 | 14 | | | CLK |
 | 12 | | | DAT0_DO |
-| 15 | | | CD (optional) |
+| 35 | | | CD (optional) |
 
 Optional speaker on GPIO25.
 
