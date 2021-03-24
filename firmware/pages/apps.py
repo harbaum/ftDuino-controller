@@ -236,6 +236,9 @@ class Page_Apps:
             else:
                 # send released event to the close button so this in turn
                 # closes the windows which is currently open
+                self.close_btn.set_event_cb(None)            # prevent buttons own events
+                on_close(self.close_btn, lv.EVENT.PRESSED);
+                on_close(self.close_btn, lv.EVENT.CLICKED);  # needed to call close()
                 on_close(self.close_btn, lv.EVENT.RELEASED);
 
         # assume app has no own page
