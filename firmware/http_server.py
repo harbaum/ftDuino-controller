@@ -291,8 +291,21 @@ class http_server:
         
         # try to fetch body
         try:
+            # TODO: figure out how to pass a pointer to the middle
+            # of the buffer to req.recv() eliminating the need for
+            # the chunk buffer
+            print("receiving", req.content_len);
             buffer = bytearray(req.content_len);
-            req.recv(buffer, len(buffer))
+            chunk = bytearray(req.content_len);
+
+            # data may arrive in chunks
+            bytes = 0
+            while bytes < req.content_len:
+                rcv = req.recv(chunk, len(buffer)-bytes)
+                # copy received data into buffer
+                buffer[bytes:bytes+rcv] = chunk[:rcv]
+                bytes += rcv
+                
             lines = buffer.decode("utf-8").splitlines();
         except Exception as e:
             print("Exception while reading post data:", e);

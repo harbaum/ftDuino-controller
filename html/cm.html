@@ -16,6 +16,16 @@
     <script>
       var editor;
       
+      function betterTab(cm) {
+	  console.log("better tab");
+	  if (cm.somethingSelected()) {
+	      cm.indentSelection("add");
+	  } else {
+	      cm.replaceSelection(cm.getOption("indentWithTabs")? "\t":
+		  Array(cm.getOption("indentUnit") + 1).join(" "), "end", "+input");
+	  }
+      }
+      
       function init() {
 	  // initialize the codemirror editor
 	  editor = CodeMirror.fromTextArea(document.getElementById("code"), {
@@ -23,12 +33,13 @@
                       version: 3,
                       singleLineStringErrors: false},
               lineNumbers: true,
-	      indentWithTabs: true, // useful for python
-	      tabSize: 2,     // -"-
-              indentUnit: 2,  // to match blockly
+	      indentWithTabs: false, // useful for python
+	      tabSize: 4,     // -"-
+              indentUnit: 4,  // to match blockly
+	      extraKeys: { Tab: betterTab },
               matchBrackets: true
 	  });
-
+	  
 	  parseUrl("py", function(name, code) {
 	      // set project name in input field and set text into editor
 	      if(name) document.getElementById("project").value = name;
