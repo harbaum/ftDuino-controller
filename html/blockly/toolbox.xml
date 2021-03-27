@@ -1,14 +1,51 @@
 <xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">
-  <category name="LVGL" colour="red">
-    <block type="page"></block>
-<!--    <category name="Objects" colour="red"> -->
-      <block type="object"></block>
-      <block type="lvgl_set_text"></block>
+  <category name="LVGL" colour="0">
+    <block type="lvgl_page"></block>
+      <block type="lvgl_object"></block>
+      <block type="lvgl_set_text">
+	<value name="text">
+          <shadow type="text"></shadow>
+	</value>
+      </block>
+      <block type="lvgl_set_state">
+	<value name="VALUE"> 
+          <shadow type="logic_boolean"></shadow>
+	</value>
+      </block>
+      <block type="lvgl_get_state"></block>
       <block type="lvgl_align"></block>
       <block type="lvgl_event"></block>
       <block type="lvgl_on_event"></block>
       <block type="lvgl_coordinate"></block>
-<!--    </category> -->
+  </category>
+  <category name="ftDuino" colour="90">
+    <block type="ftduino_i2c_scan"></block>
+    <block type="ftduino_set_addr">
+      <value name="ADDRESS">
+        <shadow type="math_number">
+          <field name="NUM">43</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="ftduino_output_mode">
+      <field name="MODE">0x01</field>
+    </block>
+    <block type="ftduino_output_value">
+      <value name="VALUE">
+        <shadow type="math_number">
+          <field name="NUM">255</field>
+        </shadow>
+      </value>
+    </block>
+  </category>
+  <category name="Misc" colour="60">
+    <block type="delay">
+      <value name="TIME">
+        <shadow type="math_number">
+          <field name="NUM">1</field>
+        </shadow>
+      </value>
+    </block>
   </category>
   <sep></sep>
   <category name="Logic" colour="%{BKY_LOGIC_HUE}">
@@ -99,6 +136,7 @@
     </block>
     <block type="lists_length"></block>
     <block type="lists_isEmpty"></block>
+    <block type="lists_contains"></block>
     <block type="lists_indexOf"></block>
     <block type="lists_getIndex"></block>
     <block type="lists_setIndex"></block>
