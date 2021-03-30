@@ -4,10 +4,10 @@ This repository contains the code for the ftDuino32 controller.
 
 ## What is the ftDuino32?
 
-The ftDuino32 controller is a ESP32 based controller with 240*320
+The ftDuino32 controller is an ESP32 based controller with 240*320
 touchscreen and SD card. It's meant to connect via I²C to an
 [ftDuino](http://ftduino.de) allowing fischertechnik toy robots to
-be programmed in Python and Blocmly using nothing but a browser.
+be programmed in Python and Blockly using nothing but a browser.
 
 The ftDuino32 runs [Micropython](https://micropython.org/) and
 [LVGL](https://lvgl.io/) allowing for touch based user interfaces
@@ -34,6 +34,7 @@ In the current state of the firmware it allows the user to:
 
 ## Videos
 
+- [Writing a Micropython app using Blockly](https://youtu.be/JS-Ef-26_-E)
 - [Testing the remote GUI](https://www.youtube.com/watch?v=9zsAbTVxjMw)
 
 ## Get it running
