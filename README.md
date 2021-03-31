@@ -62,7 +62,7 @@ The required wiring (VCC/GND is shared by the touch):
 | 32 | DC | | | |
 | 23 | SDI(MOSI) | T_DIN | | |
 | 18 | SCK | T_CLK| | |
-| 23 | SDO(MISO) | T_DO | | |
+| 19 | SDO(MISO) | T_DO | | |
 | 26 | | T_CS | | |
 | 34 | | T_IRQ | | |
 | 15 | | | CD_DAT3_CS | |
