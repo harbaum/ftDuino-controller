@@ -137,9 +137,30 @@ make -C mpy-cross
 make -C ports/esp32 BOARD=GENERIC_SPIRAM deploy
 ```
 
-This will result in the micropython firmware to be flashed to the ESP32.
+This will result in the micropython firmware to be flashed to the
+ESP32.  You can connect a terminal program like picocom at 155200
+bit/s to the board and watch it boot and use the REPL.
 
 ### Step 4: Populate embedded file system
+
+If you are using a breadboard setup with a off-the-shelf TFT touchscnreen
+you'll likely have to change init_gui_esp32 in [gui.py](firmware/gui.py) to
+correct the screen colors and to ajust the touchscreen calibration:
+
+```
+    def init_gui_esp32(self):
+
+        # Initialize ILI9341 display
+        from ili9XXX import ili9341
+ 
+        self.disp = ili9341(miso=19, mosi=23, clk=18, cs=5, dc=32, rst=27, spihost=1, power=-1, backlight=33, backlight_on=1, mhz=80, factor=4, double_buffer=True, hybrid=True, asynchronous=True, initialize=True)
+
+        # Register xpt2046 touch driver
+        from xpt2046 import xpt2046
+
+        self.touch = xpt2046(cs=26, spihost=1, mhz=5, max_cmds=16, cal_x0 = 3783, cal_y0 = 3948, cal_x1 = 242, cal_y1 = 423, transpose = True, samples = 3)
+```
+
 
 Afterwards all files from [firmware](firmware/) need to be copied to
 the internal flash. A /apps directory has to be created to hold the user
