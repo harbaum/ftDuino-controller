@@ -48,7 +48,8 @@ To run the ftDuino32 setup this way you need:
 
 - ESP32 Wrover with PSRAM
 - ILI9341 based 240*320 touch TFT
-- SD card slot + SD card
+- optional SD card slot + SD card
+- optional I2C level shifter to connect to ftDuino
 
 The required wiring (VCC/GND is shared by the touch):
 
