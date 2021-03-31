@@ -32,6 +32,8 @@ In the current state of the firmware it allows the user to:
 - Trigger program execution remotely
 - Get a remote live view of the devices display
 
+![ftDuino32](ftduino32.jpg)
+
 ## Videos
 
 - [Writing a Micropython app using Blockly](https://youtu.be/JS-Ef-26_-E)
@@ -70,8 +72,12 @@ The required wiring (VCC/GND is shared by the touch):
 | 2 | | | | LED green |
 | 4 | | | | LED yellow |
 | 25 | | | | Speaker |
+| 21 | | | | I²C SDA to ftDuino |
+| 22 | | | | I²C SCL to ftDuino |
 
-## Do it yourself
+![ftDuino32 breadboard setup](ftduino32_bb.jpg)
+
+## Firmware setup
 
 This build has only been tested under Linux. These instuctions may
 be outdated as MicroPython and LVGL are being developed rather quickly.
