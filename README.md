@@ -37,7 +37,7 @@ In the current state of the firmware it allows the user to:
 - [Writing a Micropython app using Blockly](https://youtu.be/JS-Ef-26_-E)
 - [Testing the remote GUI](https://www.youtube.com/watch?v=9zsAbTVxjMw)
 
-## Get it running
+## The hardware
 
 The final device is planned to be sold fully assembled. But you can
 run it on off-the-shelf breadboard components.
@@ -50,39 +50,96 @@ To run the ftDuino32 setup this way you need:
 
 The required wiring (VCC/GND is shared by the touch):
 
-| ESP32 | TFT | TOUCH | SD card |
-|-------|---|---|---|
-| 3V3 | VCC | | VDD |
-| GND | GND | | VSS |
-| 5 | CS | | |
-| 27 | RESET | | |
-| 32 | DC | | |
-| 23 | SDI(MOSI) | T_DIN | |
-| 18 | SCK | T_CLK| |
-| 2 | LED green | | |
-| 4 | LED yellow | | |
-| 23 | SDO(MISO) | T_DO | |
-| 26 | | T_CS | |
-| 34 | | T_IRQ | |
-| 15 | | | CD_DAT3_CS |
-| 13 | | | CMD_DIN |
-| 14 | | | CLK |
-| 12 | | | DAT0_DO |
-| 35 | | | CD (optional) |
+| ESP32 | TFT | TOUCH | SD card | Optional |
+|-------|---|---|---|---|
+| 3V3 | VCC | | VDD | |
+| GND | GND | | VSS | |
+| 5 | CS | | | |
+| 27 | RESET | | | |
+| 32 | DC | | | |
+| 23 | SDI(MOSI) | T_DIN | | |
+| 18 | SCK | T_CLK| | |
+| 23 | SDO(MISO) | T_DO | | |
+| 26 | | T_CS | | |
+| 34 | | T_IRQ | | |
+| 15 | | | CD_DAT3_CS | |
+| 13 | | | CMD_DIN | |
+| 14 | | | CLK | |
+| 12 | | | DAT0_DO | |
+| 35 | | | CD (optional) | |
+| 2 | | | | LED green |
+| 4 | | | | LED yellow |
+| 25 | | | | Speaker |
 
-Optional speaker on GPIO25.
+## Do it yourself
 
-- Micropython with LVGL support
-- ESP-IDF 4.0
+This build has only been tested under Linux. These instuctions may
+be outdated as MicroPython and LVGL are being developed rather quickly.
 
-Further patches provided in this repository are needed:
+### Step 1: Install ESP-IDF
 
-- [esp-idf.patch](patches/esp-idf.patch) to add the latest http server including websocket support to the ESP-IDF 4.0
-- [http_server.patch](patches/http_server.patch) to add web server support to the micropythin bindings
-- [lvgl.patch](patches/lvgl.patch) to increase RAM access speed, to add ftDuino32 LVGL theming and to disable a few unused things to save memory
-- [uzlib_compression.patch](patches/uzlib_compression.patch) to add zlib/gzip compression to Micropython
+Clone the required version of ESP-IDF.
 
-The resulting micropython firmware needs to be flashed to the ESP32.
+```
+git clone https://github.com/espressif/esp-idf.git
+cd esp-idf
+git checkout 4c81978a3e2220674a432a588292a4c860eef27b
+git submodule update --init
+```
+
+Install the dependencies and install ESP-IDF:
+
+```
+cd esp-idf
+python -m pip install --user -r ./requirements.txt
+./install.sh
+. ./export.sh
+```
+
+Apply [patch](https://github.com/harbaum/ftDuino32/tree/main/patches)
+to add the latest http server including websocket support to the ESP-IDF 4.0:
+
+```
+cd esp-idf
+patch -p1 < esp-idf.patch
+```
+
+### Step 2: Install Micropython
+
+Clone Micropyton and install its dependencies:
+
+```
+sudo apt-get install build-essential libreadline-dev libffi-dev git pkg-config libsdl2-2.0-0 libsdl2-dev python3.8
+
+git clone --recurse-submodules https://github.com/littlevgl/lv_micropython.git
+```
+
+Apply [patches](https://github.com/harbaum/ftDuino32/tree/main/patches):
+```
+cd lv_micropython
+patch -p1 < http_server.patch
+patch -p1 < lvgl.patch
+patch -p1 < uzlib_compression.patch
+```
+
+This will add web server support to the micropythin bindings, increase
+RAM access speed, to add ftDuino32 LVGL theming and to disable a few
+unused things to save memory and add zlib/gzip compression to
+Micropython.
+
+### Step 3: Build and deploy micropython
+
+
+```
+cd lv_micropython
+. ../esp-idf/export.sh
+make -C mpy-cross
+make -C ports/esp32 BOARD=GENERIC_SPIRAM deploy
+```
+
+This will result in the micropython firmware to be flashed to the ESP32.
+
+### Step 4: Populate embedded file system
 
 Afterwards all files from [firmware](firmware/) need to be copied to
 the internal flash. A /apps directory has to be created to hold the user
