@@ -19,8 +19,8 @@ Furthermore the ftDuino includes a native web server with websocket
 capabilities allowing to use the
 [Blockly](https://developers.google.com/blockly) and
 [CodeMirror](https://codemirror.net/) code editors. Finally a remote
-view allows to fully remote control the devices touchscreen interface
-from the browser.
+view mirrors the device screen and allows to fully remote control the
+touchscreen interface from the browser.
 
 In the current state of the firmware it allows the user to:
 
@@ -85,7 +85,7 @@ be outdated as MicroPython and LVGL are being developed rather quickly.
 
 ### Step 1: Install ESP-IDF
 
-Clone the required version of ESP-IDF.
+Clone the required 4.0 version of ESP-IDF.
 
 ```
 git clone https://github.com/espressif/esp-idf.git
@@ -130,7 +130,7 @@ patch -p1 < uzlib_compression.patch
 ```
 
 This will add web server support to the micropythin bindings, increase
-RAM access speed, to add ftDuino32 LVGL theming and to disable a few
+RAM access speed, add ftDuino32 LVGL theming, disable a few
 unused things to save memory and add zlib/gzip compression to
 Micropython.
 
@@ -145,12 +145,18 @@ make -C ports/esp32 BOARD=GENERIC_SPIRAM deploy
 ```
 
 This will result in the micropython firmware to be flashed to the
-ESP32.  You can connect a terminal program like picocom at 155200
+ESP32. You can connect a terminal program like picocom at 115200
 bit/s to the board and watch it boot and use the REPL.
 
 ### Step 4: Populate embedded file system
 
-If you are using a breadboard setup with a off-the-shelf TFT touchscnreen
+In order to copy files into the micropython file system you need a
+tool like [ampy](https://github.com/scientifichackers/ampy). You can
+verify that ampy is working by entering e.g. ```ampy -p /dev/ttyUSB0
+ls```. You omit to specify the device explicitely if you install an
+environment variable like ```AMPY_PORT=/dev/ttyUSB0```.
+
+If you are using a breadboard setup with an off-the-shelf TFT touchscnreen
 you'll likely have to change init_gui_esp32 in [gui.py](firmware/gui.py) to
 correct the screen colors and to ajust the touchscreen calibration:
 
@@ -168,10 +174,10 @@ correct the screen colors and to ajust the touchscreen calibration:
         self.touch = xpt2046(cs=26, spihost=1, mhz=5, max_cmds=16, cal_x0 = 3783, cal_y0 = 3948, cal_x1 = 242, cal_y1 = 423, transpose = True, samples = 3)
 ```
 
-
 Afterwards all files from [firmware](firmware/) need to be copied to
-the internal flash. A /apps directory has to be created to hold the user
-generated programs.
+the internal flash. Additionally an /apps directory has to be created
+to hold the user generated programs. You can optionally copy
+[some example apps](apps/) there.
 
 Finally the [html](html/) pages need to be copies to the internal flash
 using the [install script](html/install.sh).
