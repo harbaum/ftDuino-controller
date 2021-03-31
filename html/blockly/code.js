@@ -58,7 +58,7 @@ var customBlocks = [
 	"tooltip": "A LVGL UI page"
     }, {
 	"type": "lvgl_object",
-	"message0": "New %1 of type %2",
+	"message0": "new %1 type %2",
 	"args0": [ {
 	    "type": "field_variable",
 	    "name": "object",
@@ -67,10 +67,13 @@ var customBlocks = [
 	    "type": "field_dropdown",
 	    "name": "type",
 	    "options": [
-		[ "Label",  "  lv.label"    ],
+		[ "Label",    "lv.label"    ],
 		[ "Button",   "lv.btn"      ],
 		[ "Switch",   "lv.switch"   ],
-		[ "Checkbox", "lv.checkbox" ]
+		[ "Checkbox", "lv.checkbox" ],
+		[ "Slider",   "lv.slider"   ],
+		[ "Gauge",    "lv.gauge"    ],
+		[ "Chart",    "lv.chart"    ]
 	    ]
 	} ],
 	"previousStatement": null,
@@ -93,7 +96,7 @@ var customBlocks = [
 	"colour": Code.color_lvgl
     }, {
 	"type": "lvgl_align",
-	"message0": "Align %1 %2 %3",
+	"message0": "align %1 %2 %3",
 	"args0": [ {
 	    "type": "field_variable",
 	    "name": "object",
@@ -120,7 +123,37 @@ var customBlocks = [
 	}, {
 	    "type": "input_value",
 	    "name": "COORDINATE",
-	    "check": "coo"
+	    "check": "Array"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_lvgl
+    }, {
+	"type": "lvgl_set_size",
+	"message0": "set %1 size %2",
+	"args0": [ {
+	    "type": "field_variable",
+	    "name": "OBJECT",
+	    "variable": "object"
+	}, {
+	    "type": "input_value",
+	    "name": "SIZE",
+	    "check": "Array"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_lvgl
+    }, {
+	"type": "lvgl_set_width",
+	"message0": "set %1 width %2",
+	"args0": [ {
+	    "type": "field_variable",
+	    "name": "OBJECT",
+	    "variable": "object"
+	}, {
+	    "type": "input_value",
+	    "name": "WIDTH",
+	    "check": "Number"
 	} ],
 	"previousStatement": null,
 	"nextStatement": null,
@@ -143,21 +176,22 @@ var customBlocks = [
 	"colour": Code.color_lvgl
     }, {
 	"type": "lvgl_event",
-	"message0": "if event is %1",
+	"message0": "event is %1",
 	"args0": [ {
 	    "type": "field_dropdown",
 	    "name": "EVENT",
 	    "options": [
-		[ "clicked", "lv.EVENT.CLICKED" ],
-		[ "pressed", "lv.EVENT.PRESSED" ],
-		[ "released", "lv.EVENT.RELEASED" ]
+		[ "clicked",       "lv.EVENT.CLICKED" ],
+		[ "pressed",       "lv.EVENT.PRESSED" ],
+		[ "released",      "lv.EVENT.RELEASED" ],
+		[ "value changed", "lv.EVENT.VALUE_CHANGED" ]
 	    ]
 	} ],
 	"output": "Boolean",
 	"colour": Code.color_lvgl
     },{
 	"type": "lvgl_coordinate",
-	"message0": "%1 , %2",
+	"message0": "%1/%2",
 	"args0": [ {
 	    "type": "input_value",
 	    "name": "X"
@@ -166,7 +200,7 @@ var customBlocks = [
 	    "name": "Y"
 	} ],
 	"inputsInline": true,
-	"output": "coo",
+	"output": "Array",
 	"colour": Code.color_lvgl
     }, {
 	"type": "lvgl_set_state",
@@ -192,6 +226,81 @@ var customBlocks = [
 	    "variable": "object"
 	} ],
 	"output": "Boolean",
+	"colour": Code.color_lvgl
+    }, {
+	"type": "lvgl_set_value",
+	"message0": "set %1 value %2",
+	"args0": [ {
+	    "type": "field_variable",
+	    "name": "OBJECT",
+	    "variable": "object"
+	}, {
+	    "type": "input_value",
+	    "name": "VALUE",
+	    "check": [ "Number", "Array", "Boolean" ]
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_lvgl
+    }, {
+	"type": "lvgl_get_value",
+	"message0": "get %1 value",
+	"args0": [ {
+	    "type": "field_variable",
+	    "name": "OBJECT",
+	    "variable": "object"
+	} ],
+	"output": [ "Number", "Array", "Boolean" ],
+	"colour": Code.color_lvgl
+    }, {
+	"type": "lvgl_set_colour",
+	"message0": "set %1 colour %2",
+	"args0": [ {
+	    "type": "field_variable",
+	    "name": "OBJECT",
+	    "variable": "object"
+	}, {
+	    "type": "input_value",
+	    "name": "COLOUR",
+	    "check": [ "Colour", "Array" ]
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_lvgl
+    }, {
+	"type": "lvgl_task",
+	"message0": "every %1 seconds %2 %3",
+	"args0": [ {
+	    "type": "field_number",
+	    "name": "RATE",
+	    "value": 1
+	}, {
+	    "type": "input_dummy"
+	},  {
+	    "type": "input_statement",
+	    "name": "HANDLER"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_lvgl
+    }, {
+	"type": "lvgl_add_series",
+	"message0": "add %1 %2 to chart %3",
+	"args0": [ {
+	    "type": "field_variable",
+	    "name": "SERIES",
+	    "variable": "series"
+	}, {
+	    "type": "field_colour",
+	    "name": "COLOUR",
+	    "colour": "#ff0000"
+	}, {
+	    "type": "field_variable",
+	    "name": "OBJECT",
+	    "variable": "object"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
 	"colour": Code.color_lvgl
     },
     
@@ -257,7 +366,48 @@ var customBlocks = [
 	"previousStatement": null,
 	"nextStatement": null,
 	"colour": Code.color_ftduino
-    }   
+    }, {
+	"type": "ftduino_input_mode",
+	"message0": "set input %1 mode %2",
+	"args0": [ {
+	    "type": "field_dropdown",
+	    "name": "PORT",
+	    "options": [ [ "I1", "0x10" ],
+			 [ "I2", "0x12" ],
+			 [ "I3", "0x14" ],
+			 [ "I4", "0x16" ],
+			 [ "I5", "0x18" ],
+			 [ "I6", "0x1a" ],
+			 [ "I7", "0x1c" ],
+			 [ "I8", "0x1e" ] ]
+	}, {
+	    "type": "field_dropdown",
+	    "name": "MODE",
+	    "options": [ [ "Voltage",     "0x00" ],
+			 [ "Resistance",  "0x01" ],
+			 [ "Switch",      "0x02" ] ]
+	} ],	
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_ftduino
+    }, {
+	"type": "ftduino_input_value",
+	"message0": "get input %1",
+	"args0": [ {
+	    "type": "field_dropdown",
+	    "name": "PORT",
+	    "options": [ [ "I1", "0x10" ],
+			 [ "I2", "0x12" ],
+			 [ "I3", "0x14" ],
+			 [ "I4", "0x16" ],
+			 [ "I5", "0x18" ],
+			 [ "I6", "0x1a" ],
+			 [ "I7", "0x1c" ],
+			 [ "I8", "0x1e" ] ]
+        } ],
+	"output": "Number",
+	"colour": Code.color_ftduino
+    }
 ]
 
 function loadToolbox() {
@@ -280,16 +430,27 @@ function prepend_lines(str, prefix) {
     return result;
 }
 
-function getGlobal(prefix) {
+function getGlobal(block, prefix) {
     // all variables are global in blockly
-    var usedVars = Blockly.Variables.allUsedVarModels(Code.workspace);
-    // console.log("All used vars", usedVars);
+    var usedVars = Blockly.Variables.allUsedVarModels(block.workspace);
+    var devVars = Blockly.Variables.allDeveloperVariables(block.workspace);
 
-    if(!usedVars.length) return "";
+    if(!usedVars.length && !devVars.length) return "";
+
+    // start with user variables
+    var globals = []
+    usedVars.forEach(v => {
+	globals.push(Blockly.Python.variableDB_.getName(v["name"],
+			Blockly.VARIABLE_CATEGORY_NAME));
+    });
+
+    // Add developer variables.
+    devVars.forEach(v => {
+	globals.push(Blockly.Python.variableDB_.getName(v,
+			Blockly.Names.DEVELOPER_VARIABLE_TYPE));
+    });
     
-    var global = "global ";
-    usedVars.forEach(v => { global += v["name"] + ","; });
-    return prefix + global.substring(0, global.length - 1) + "\n";
+    return prefix + "global " + globals.join(', ') + "\n";
 }
 
 function toolbox_install(toolboxText) {
@@ -303,6 +464,10 @@ function toolbox_install(toolboxText) {
 	if(b["type"].startsWith("ftduino_"))
 	    Blockly.Blocks[b["type"]]["getDeveloperVars"] =
 	    function() { return ['i2cBus', 'ftduinoAddress' ]; }
+	
+	if(b["type"].startsWith("lvgl_task"))
+	    Blockly.Blocks[b["type"]]["getDeveloperVars"] =
+	    function() { return ['tasks' ]; }
     });
     
     Code.workspace = Blockly.inject('blocklyDiv',
@@ -341,9 +506,71 @@ function toolbox_install(toolboxText) {
     /********************          LVGL        **********************/
     /****************************************************************/
 
-    Blockly.Python['lvgl_page'] = function(block) {
+    function parse_coordinate(coo_str) {
+	var c = [];
+	if(coo_str == "") { coo_str = "[ 0, 0 ]"; }
+	
+	// coo_str may be an array or a variable holding an array
+	// TODO: This is not perfect and would fail if there are additional comma within
+	// the coo_str. But this is quite unlikely to occur
+	if(coo_str.trim().startsWith("[") && coo_str.trim().endsWith("]")) {
+	    var value = coo_str.trim();
+	    var coos = value.substring(1,value.length-1).split(",")
+	    c[0] = coos[0].trim();
+	    if(coos.length < 2) c[1] = "0";
+	    else                c[1] = coos[1].trim();
+	} else {
+	    c[0] = coo_str+"[0]";
+	    c[1] = coo_str+"[1]";
+	}
+	return c;
+    }
+    
+    function lvgl_prepare(needsColor, needsSeries) {
+	var tasksVar = Blockly.Python.variableDB_.getName('tasks', Blockly.Names.DEVELOPER_VARIABLE_TYPE);	
+	var vars = Blockly.Python.definitions_['variables'].split("\n");
+	var new_vars = [ ]
+	vars.forEach(v => {	    	    
+	    switch(v.split("=")[0].trim()) {
+	    case tasksVar:
+		v = tasksVar + " = []";
+		break;
+	    }
+	    new_vars.push(v);
+	});
+
+	var retval = { tasks: tasksVar };
+	
+	if(needsSeries) {
+	    retval["series"] = Blockly.Python.provideFunction_(
+		'lvgl_series',
+		[ "class " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + ":",
+		  "  def __init__(self, __chart, __color):",
+		  "    self.chart = __chart",
+		  "    self.series = self.chart.add_series(__color)",
+		  "  def set_values(self, __values):",
+		  "    for __i in range(len(__values)):",
+		  "      __values[__i] = int(__values[__i])",
+		  "    self.chart.set_points(self.series, __values);"
+		] );
+	}
+	    
+	if(needsColor) {
+	    retval["color"] = Blockly.Python.provideFunction_(
+	    'lvgl_colour',
+	    [ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(colour):',
+	      "  return lv.color_hex(int(colour[1:], 16))" ])
+	}
+
+	Blockly.Python.definitions_['variables'] = new_vars.join('\n');
 	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
 
+	return retval;
+    }
+    
+    Blockly.Python['lvgl_page'] = function(block) {
+	var vars = lvgl_prepare(true, false);
+	
 	var colour_bg = block.getFieldValue('BGCOLOR');
 	var title = block.getFieldValue('TITLE');
 	var statements = Blockly.Python.statementToCode(block, 'CONTENT');
@@ -357,8 +584,7 @@ function toolbox_install(toolboxText) {
 		"        # set background color\n" +
 		"        bg_style = lv.style_t();\n" +
 		"        bg_style.set_bg_opa(lv.STATE.DEFAULT, lv.OPA.COVER);\n" +
-		"        bg_style.set_bg_color(lv.STATE.DEFAULT, " +
-		"lv.color_hex(0x"+colour_bg.substring(1)+"));\n" +
+		"        bg_style.set_bg_color(lv.STATE.DEFAULT, "+vars["color"]+"('"+colour_bg+"'));\n" +
 		"        page.add_style(lv.obj.PART.MAIN, bg_style);\n\n" +
 		statements;
 	}
@@ -372,14 +598,35 @@ function toolbox_install(toolboxText) {
 	    code += "    def title():\n"
             code += "        return \""+ title+"\";\n\n";    
 	}
-	code += "    def __init__(self, page):\n" + getGlobal("        ")
+
+	// check if the developer variables now contain "tasks". That would
+	// mean that the user has used tasks and we need to clean them up
+	var found = false;
+	var tasksVar = Blockly.Python.variableDB_.getName('tasks', Blockly.Names.DEVELOPER_VARIABLE_TYPE);	
+	var vars = Blockly.Python.definitions_['variables'].split("\n");
+	vars.forEach(v => {	    	    
+	    if(v.split("=")[0].trim() == tasksVar)
+		found = true;
+	});
+	if(found) {
+	    code += "    # close is being called by the ftDuino32 when\n"
+	    code += "    # the page is being closed by the user\n"
+	    code += "    def close(self):\n" + getGlobal(block, "        ")
+	    code += "        # cleaning up tasks\n"
+	    code += "        for t in "+tasksVar+":\n"
+	    code += "            t.set_repeat_count(0);\n"
+	    code += "        "+tasksVar+" = None\n"
+	    code += "\n"
+	}
+	
+	code += "    def __init__(self, page):\n" + getGlobal(block, "        ")
 	
 	return code + statements;
     };
 
     // tell generator about our custom blocks
     Blockly.Python['lvgl_object'] = function(block) {
-	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
+	lvgl_prepare(false, false);
 	var variable_obj = Blockly.Python.variableDB_.getName(block.getFieldValue('object'), Blockly.Variables.NAME_TYPE);
 	var dropdown_type = block.getFieldValue('type');
 	var code = variable_obj + " = " + dropdown_type + "(page);\n";
@@ -387,7 +634,7 @@ function toolbox_install(toolboxText) {
     };
 
     Blockly.Python['lvgl_set_text'] = function(block) {
-	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
+	lvgl_prepare(false, false);
 	var functionName = Blockly.Python.provideFunction_(
 	    'lvgl_set_text',
 	    [ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(obj, str):',
@@ -405,7 +652,7 @@ function toolbox_install(toolboxText) {
     };
 
     Blockly.Python['lvgl_set_state'] = function(block) {
-	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
+	lvgl_prepare(false, false);
 	var functionName = Blockly.Python.provideFunction_(
 	    'lvgl_set_state',
 	    [ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(obj, state):',
@@ -422,7 +669,7 @@ function toolbox_install(toolboxText) {
     };
     
     Blockly.Python['lvgl_get_state'] = function(block) {
-	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
+	lvgl_prepare(false, false);
 	var functionName = Blockly.Python.provideFunction_(
 	    'lvgl_get_state',
 	    [ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(obj):',
@@ -437,50 +684,169 @@ function toolbox_install(toolboxText) {
     };
     
     Blockly.Python['lvgl_align'] = function(block) {
-	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
+	lvgl_prepare(false, false);
 	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('object'), Blockly.Variables.NAME_TYPE);
 	var dropdown_align = block.getFieldValue('ALIGN');
 	var value_coordinate = Blockly.Python.valueToCode(block, 'COORDINATE', Blockly.Python.ORDER_ATOMIC);
-	if(value_coordinate == "") { value_coordinate = "0, 0"; }
-
-	var code = variable_object+".align(page, " + dropdown_align + ", " + value_coordinate + ");\n";
+	var c = parse_coordinate(value_coordinate);
+	var code = variable_object+".align(page, " + dropdown_align + ", " + c[0] + ", " + c[1] + ");\n";
 	return code;
     };
 
-    Blockly.Python['lvgl_on_event'] = function(block) {
-	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
-	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('object'), Blockly.Variables.NAME_TYPE);
-	var statements_handler = Blockly.Python.statementToCode(block, 'handler');
-
-	if(statements_handler == "") statements_handler = "    pass\n";
-
-	var code =
-	    "def on_event(obj, evt):\n" + getGlobal("    ") + statements_handler + "\n" +
-	    variable_object + ".set_event_cb(on_event)\n";
-	    
+    Blockly.Python['lvgl_set_size'] = function(block) {
+	lvgl_prepare(false, false);
+	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('OBJECT'), Blockly.Variables.NAME_TYPE);
+	var value_size = Blockly.Python.valueToCode(block, 'SIZE', Blockly.Python.ORDER_ATOMIC);
+	var c = parse_coordinate(value_size);
+	var code = variable_object+".set_size(" + c[0] + ", " + c[1] + ");\n";
 	return code;
     };
     
+    Blockly.Python['lvgl_set_width'] = function(block) {
+	lvgl_prepare(false, false);
+	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('OBJECT'), Blockly.Variables.NAME_TYPE);
+	var value_width = Blockly.Python.valueToCode(block, 'WIDTH', Blockly.Python.ORDER_ATOMIC);
+	var code = variable_object+".set_width(" + value_width + ");\n";
+	return code;
+    };
+    
+    Blockly.Python['lvgl_on_event'] = function(block) {
+	lvgl_prepare(false, false);
+	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('object'), Blockly.Variables.NAME_TYPE);
+	var statements_handler = Blockly.Python.statementToCode(block, 'handler');
+
+	if(statements_handler == "") return "";
+
+	// todo: make function name unique and perhaps the function global
+	var code = "def on_event(obj, evt):\n" + getGlobal(block, "    ") + statements_handler +
+	    "\n" + variable_object + ".set_event_cb(on_event)\n";
+	    
+	return code;
+    };
+
     Blockly.Python['lvgl_event'] = function(block) {
-	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
+	lvgl_prepare(false, false);
 	var dropdown_event = block.getFieldValue('EVENT');
 	var code = "evt == " + dropdown_event;
 	return [code, Blockly.Python.ORDER_NONE];
     };
+    
+    Blockly.Python['lvgl_set_value'] = function(block) {
+	var vars = lvgl_prepare(false, true);
+	var functionName = Blockly.Python.provideFunction_(
+	    'lvgl_set_value',
+	    [ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(__obj, __value):',
+	      // TODO: This can completely replace set_state
+	      "  if isinstance(__obj, lv.checkbox):", 
+              "    __obj.set_checked(__value);", 
+	      "  elif isinstance(__obj, lv.switch):",
+	      "    if __value: __obj.on(lv.ANIM.OFF)",
+	      "    else:       __obj.off(lv.ANIM.OFF)",
+	      "  elif isinstance(__obj, lv.slider):",
+	      "    __obj.set_value(__value, lv.ANIM.OFF);", 
+	      "  elif isinstance(__obj,"+vars['series']+"):",
+	      "    __obj.set_values(__value);",
+	      "  elif isinstance(__obj, lv.gauge):",
+	      "    # gauge takes single value or array",
+	      "    try:     __num = len(__value)",
+	      "    except:  __num = None",
+	      "    if not __num:",
+	      "      # no array: just set a single value",
+	      "      __obj.set_value(0, int(__value))",
+	      "    else:",
+	      "      for __i in range(__num):",
+	      "        __obj.set_value(__i, int(__value[__i]))"
+	    ]);
+	
+	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('OBJECT'), Blockly.Variables.NAME_TYPE);
+	var value_value = Blockly.Python.valueToCode(block, 'VALUE', Blockly.Python.ORDER_ATOMIC);
+	var code = functionName + "("+variable_object+","+value_value+")\n";
+	return code;
+    };
 
+    Blockly.Python['lvgl_get_value'] = function(block) {
+	lvgl_prepare(false, false);
+	var functionName = Blockly.Python.provideFunction_(
+	    'lvgl_get_value',
+	    [ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(__obj):',
+	      "  if isinstance(__obj, lv.checkbox):", 
+              "    return __obj.is_checked();", 
+	      "  elif isinstance(__obj, lv.switch):",
+	      "    return __obj.get_state()",
+	      "  elif isinstance(__obj, lv.slider):",
+	      "    return __obj.get_value();", 
+	      "  return None"
+	    ]);
+	
+	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('OBJECT'), Blockly.Variables.NAME_TYPE);
+	var code = functionName + "("+variable_object+")";
+	return [code, Blockly.Python.ORDER_FUNCTION_CALL];
+    };
+    
+    Blockly.Python['lvgl_set_colour'] = function(block) {
+	var vars = lvgl_prepare(true, false);
+
+	var functionName = Blockly.Python.provideFunction_(
+	    'lvgl_set_colour',
+	    [ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(obj, colour):',
+	      "  if isinstance(obj, lv.gauge):", 
+	      "    # gauge takes single colour or array",
+	      "    try:     __num = len(colour)",
+	      "    except:  __num = None",
+	      "    if not __num:",
+	      "      # no array, just a single colour",
+	      "      obj.set_needle_count(1, "+vars["color"]+"(colour))",
+	      "    else:",
+	      "      __colarr = []",
+	      "      for __c in colour:",
+	      "         __colarr.append("+vars["color"]+"(__c))",
+	      "      obj.set_needle_count(__num, __colarr)",
+	    ]);
+	      
+	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('OBJECT'), Blockly.Variables.NAME_TYPE);
+	var value_colour = Blockly.Python.valueToCode(block, 'COLOUR', Blockly.Python.ORDER_ATOMIC);
+	var code = functionName + "("+variable_object+","+value_colour+")\n";
+	return code;
+    };
+    
     Blockly.Python['lvgl_coordinate'] = function(block) {
-	Blockly.Python.definitions_['import_lvgl_as_lv'] = "import lvgl as lv";
-	var value_x = Blockly.Python.valueToCode(block, 'X', Blockly.Python.ORDER_ATOMIC);
-	var value_y = Blockly.Python.valueToCode(block, 'Y', Blockly.Python.ORDER_ATOMIC);
-	var code = value_x + ", " + value_y;
+	lvgl_prepare(false, false);
+	var value_x = Blockly.Python.valueToCode(block, 'X', Blockly.Python.ORDER_NONE);
+	var value_y = Blockly.Python.valueToCode(block, 'Y', Blockly.Python.ORDER_NONE);
+	var code = "[" + value_x + ", " + value_y + "]";
 	return [code, Blockly.Python.ORDER_ATOMIC];
     };
 
+    Blockly.Python['lvgl_task'] = function(block) {
+	var vars = lvgl_prepare(false, false);
+	// we need a variable to keep track of running handlers to be able to stop
+	// them when the page is being closed
+	var tasksVar = Blockly.Python.variableDB_.getName('tasks', Blockly.Names.DEVELOPER_VARIABLE_TYPE);
+	
+	var number_rate = block.getFieldValue('RATE');
+	var statements_handler = Blockly.Python.statementToCode(block, 'HANDLER');
+	var code = "def _task(__parm):\n" + getGlobal(block, "    ") +
+	    "    # don't run if tasks have been stopped\n" + 
+	    "    if not " + vars["tasks"] + ": return\n" + statements_handler +
+	    vars["tasks"] + ".append(lv.task_create(_task, " + Math.round(number_rate*1000) + ", lv.TASK_PRIO.MID, None));\n";
+	return code;
+    };
+    
+    Blockly.Python['lvgl_add_series'] = function(block) {
+	var vars = lvgl_prepare(true, true);
+	
+	var variable_series = Blockly.Python.variableDB_.getName(block.getFieldValue('SERIES'), Blockly.Variables.NAME_TYPE);
+	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('OBJECT'), Blockly.Variables.NAME_TYPE);
+	var colour_colour = block.getFieldValue('COLOUR');
+	var code = variable_series + " = " + vars["series"] + "("+variable_object + ", " + vars["color"] + "('"+colour_colour+"'))\n";
+	return code;
+    };
+    
     /****************************************************************/
     /********************        ftDuino       **********************/
     /****************************************************************/
 
-    function ftduino_prepare() {
+    function ftduino_prepare(block, needsWrite, needsRead) {
 	// make sure the i2c variables have the correct defaults
 	var busVar = Blockly.Python.variableDB_.getName('i2cBus', Blockly.Names.DEVELOPER_VARIABLE_TYPE);
 	var addrVar = Blockly.Python.variableDB_.getName('ftduinoAddress', Blockly.Names.DEVELOPER_VARIABLE_TYPE);
@@ -504,40 +870,82 @@ function toolbox_install(toolboxText) {
 	Blockly.Python.definitions_['variables'] = new_vars.join('\n');
 	Blockly.Python.definitions_['from_machine_import_Pin_I2C'] = "from machine import Pin, I2C";
 
-	return { bus: busVar, addr: addrVar };
+	var retval = { bus: busVar, addr: addrVar };
+	
+	// forgiving i2c read/write
+	if(needsWrite) {
+	    retval["write"] = Blockly.Python.provideFunction_(
+		'ftduino_write',
+		[ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(__reg, __value):',
+		  getGlobal(block, "  "),
+		  "  try:",
+		  "    " + busVar + ".writeto_mem(" + addrVar + ", __reg, bytearray([int(__value)]));",
+		  "  except:",
+		  "    # ftDuino write failed, return anyway",
+		  "    pass"
+		])
+	}
+	
+	if(needsRead) {
+	    retval["read"] = Blockly.Python.provideFunction_(
+		'ftduino_read',
+		[ "def " + Blockly.Python.FUNCTION_NAME_PLACEHOLDER_ + '(__reg):',
+		  getGlobal(block, "  "),
+		  "  try:",
+		  "    return int.from_bytes(" + busVar + ".readfrom_mem(" + addrVar + ", __reg, 2), 'little')",
+		  "  except:",
+		  "    # ftDuino read failed, return anyway",
+		  "    return 0"
+		])
+	}
+	    
+	return retval;
     }
     
     Blockly.Python['ftduino_i2c_scan'] = function(block) {
-	var vars = ftduino_prepare()
+	var vars = ftduino_prepare(block, false, false)
 	var code = vars["bus"]+".scan()"
 	return [code, Blockly.Python.ORDER_FUNCTION_CALL];
     };
 
     Blockly.Python['ftduino_set_addr'] = function(block) {
-	var vars = ftduino_prepare()
+	var vars = ftduino_prepare(block, false, false)
 	var value_address = Blockly.Python.valueToCode(block, 'ADDRESS', Blockly.Python.ORDER_ATOMIC);
 	var code = vars["addr"] + " = " + value_address + "\n";
 	return code;
     };
     
     Blockly.Python['ftduino_output_mode'] = function(block) {
-	var vars = ftduino_prepare()	
+	var vars = ftduino_prepare(block, true, false)	
 	var dropdown_port = block.getFieldValue('PORT');
 	var dropdown_mode = block.getFieldValue('MODE');
-	var code = vars["bus"] + ".writeto(" + vars["addr"] +
-	    ", bytearray([ "+ dropdown_port+", "+ dropdown_mode+"]))\n";
+	var code = vars["write"] + "(" + dropdown_port + ", "+ dropdown_mode+")\n";
 	return code;
     };
     
     Blockly.Python['ftduino_output_value'] = function(block) {
-	var vars = ftduino_prepare()	
+	var vars = ftduino_prepare(block, true, false)	
 	var dropdown_port = block.getFieldValue('PORT');
 	var value_value = Blockly.Python.valueToCode(block, 'VALUE', Blockly.Python.ORDER_ATOMIC);
-	var code = vars["bus"] + ".writeto(" + vars["addr"] +
-	    ", bytearray([ "+ dropdown_port+", "+ value_value+"]))\n";
+	var code = vars["write"] + "(" + dropdown_port + ", "+ value_value+")\n";
 	return code;
     };
 
+    Blockly.Python['ftduino_input_mode'] = function(block) {
+	var vars = ftduino_prepare(block, true, false)	
+	var dropdown_port = block.getFieldValue('PORT');
+	var dropdown_mode = block.getFieldValue('MODE');
+	var code = vars["write"] + "(" + dropdown_port + ", "+dropdown_mode +")\n";
+	return code;
+    };
+    
+    Blockly.Python['ftduino_input_value'] = function(block) {
+	var vars = ftduino_prepare(block, false, true)	
+	var dropdown_port = block.getFieldValue('PORT');
+	var code = vars["read"]+"(" + dropdown_port + ")";
+	return [code, Blockly.Python.ORDER_NONE];
+    };
+    
     Blockly.Python['delay'] = function(block) {
 	Blockly.Python.definitions_['import_utime'] = "import utime";
 	var time_value = Blockly.Python.valueToCode(block, 'TIME', Blockly.Python.ORDER_ATOMIC);

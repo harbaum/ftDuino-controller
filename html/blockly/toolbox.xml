@@ -7,16 +7,62 @@
           <shadow type="text"></shadow>
 	</value>
       </block>
-      <block type="lvgl_set_state">
+      <block type="lvgl_get_value"></block>
+      <block type="lvgl_set_value">
 	<value name="VALUE"> 
-          <shadow type="logic_boolean"></shadow>
+          <shadow type="math_number">
+	    <field name="NUM">10</field>
+	  </shadow>
 	</value>
       </block>
-      <block type="lvgl_get_state"></block>
-      <block type="lvgl_align"></block>
+      <block type="lvgl_set_colour">
+	<value name="COLOUR"> 
+          <shadow type="colour_picker"></shadow>
+	</value>
+      </block>
+      <block type="lvgl_align">
+	<value name="COORDINATE">
+          <block type="lvgl_coordinate">
+	    <value name="X">
+              <shadow type="math_number">
+		<field name="NUM">0</field>
+              </shadow>
+	    </value>
+	    <value name="Y">
+              <shadow type="math_number">
+		<field name="NUM">0</field>
+              </shadow>
+	    </value>
+          </block>
+	</value>
+      </block>
+      <block type="lvgl_set_size">
+	<value name="SIZE">
+          <block type="lvgl_coordinate">
+	    <value name="X">
+              <shadow type="math_number">
+		<field name="NUM">0</field>
+              </shadow>
+	    </value>
+	    <value name="Y">
+              <shadow type="math_number">
+		<field name="NUM">0</field>
+              </shadow>
+	    </value>
+          </block>
+	</value>
+      </block>
+      <block type="lvgl_set_width">
+	<value name="WIDTH">
+          <shadow type="math_number">
+	    <field name="NUM">200</field>
+	  </shadow>
+	</value>
+      </block>
       <block type="lvgl_event"></block>
       <block type="lvgl_on_event"></block>
-      <block type="lvgl_coordinate"></block>
+      <block type="lvgl_task"></block>
+      <block type="lvgl_add_series"></block>
   </category>
   <category name="ftDuino" colour="90">
     <block type="ftduino_i2c_scan"></block>
@@ -27,6 +73,10 @@
         </shadow>
       </value>
     </block>
+    <block type="ftduino_input_mode">
+      <field name="MODE">0x02</field>
+    </block>
+    <block type="ftduino_input_value"></block>
     <block type="ftduino_output_mode">
       <field name="MODE">0x01</field>
     </block>
@@ -54,6 +104,7 @@
     <block type="logic_operation"></block>
     <block type="logic_negate"></block>
     <block type="logic_boolean"></block>
+    <block type="logic_ternary"></block>
   </category>
   <category name="Loops" colour="%{BKY_LOOPS_HUE}">
     <block type="controls_repeat_ext">
@@ -137,7 +188,9 @@
     <block type="lists_length"></block>
     <block type="lists_isEmpty"></block>
     <block type="lists_contains"></block>
-    <block type="lists_indexOf"></block>
+    <block type="lists_indexOf"></block>l
+    <block type="lists_getSublist"></block>l
+    <block type="lists_split"></block>l
     <block type="lists_getIndex"></block>
     <block type="lists_setIndex"></block>
   </category>
@@ -158,6 +211,45 @@
     </block>
   </category>
 
+  <category name="Colour" colour="%{BKY_COLOUR_HUE}">
+    <block type="colour_picker"></block>
+    <block type="colour_random"></block>
+    <block type="colour_rgb">
+      <value name="RED">
+        <shadow type="math_number">
+          <field name="NUM">100</field>
+        </shadow>
+      </value>
+      <value name="GREEN">
+        <shadow type="math_number">
+          <field name="NUM">50</field>
+        </shadow>
+        </value>
+        <value name="BLUE">
+          <shadow type="math_number">
+            <field name="NUM">0</field>
+          </shadow>
+        </value>
+    </block>
+    <block type="colour_blend">
+      <value name="COLOUR1">
+        <shadow type="colour_picker">
+          <field name="COLOUR">#ff0000</field>
+        </shadow>
+      </value>
+      <value name="COLOUR2">
+        <shadow type="colour_picker">
+          <field name="COLOUR">#3333ff</field>
+        </shadow>
+      </value>
+      <value name="RATIO">
+        <shadow type="math_number">
+            <field name="NUM">0.5</field>
+        </shadow>
+      </value>
+      </block>
+  </category>
+  
   <sep></sep>
   <category name="Variables" custom="VARIABLE" colour="%{BKY_VARIABLES_HUE}">
   </category>
