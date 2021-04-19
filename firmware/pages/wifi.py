@@ -162,8 +162,12 @@ class Page_WiFi:
                     self.server = http_server()
                     self.server.register_input_callback()
                 except Exception as e:
-                    print("Webserver error:", e)
+                    print("Webserver error:", e
 
+                import espidf
+                if espidf.mdns_init() == 0:
+                    espidf.mdns_hostname_set('ftduino32')            
+                    
             else:
                 self.label.set_text("Connection failed");
                 
