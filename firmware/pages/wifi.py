@@ -162,7 +162,7 @@ class Page_WiFi:
                     self.server = http_server()
                     self.server.register_input_callback()
                 except Exception as e:
-                    print("Webserver error:", e
+                    print("Webserver error:", e)
 
                 import espidf
                 if espidf.mdns_init() == 0:
