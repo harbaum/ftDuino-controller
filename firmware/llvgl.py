@@ -12,7 +12,6 @@
 # TODO:
 # - Use full content area
 # - set sane default sizes
-# - fix sys.path.append(r'/xyz/abc')
 # - dark close button bg
 # - adjust gauge style on resize
 
