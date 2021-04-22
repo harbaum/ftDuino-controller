@@ -168,6 +168,16 @@ class Page_Apps:
                     return True
             
         return False
+    
+    def check_for_llvgl_import(self, code):
+        # scan over all lines
+        for line in code.splitlines():
+            line = line.strip()
+            if line.startswith("import ") or line.startswith("from "):
+                if "llvgl" in line:
+                    return True
+                
+        return False            
 
     def run_in_console(self, name, code):
         def done_cb():
@@ -181,6 +191,24 @@ class Page_Apps:
         self.close_btn.set_state(lv.STATE.DISABLED);
         console.run(code, done_cb)
 
+    def run_with_llvgl(self, name):
+        def load_failed(e):
+            gui.DialogBox(Page_Apps.exception_str(e), lv.scr_act())
+                
+        print("Running with llvgl", name)
+
+        # make window available to all llvgl instances
+        import llvgl
+        sys.modules['llvgl'].config = { "win": self.win, "objects": [ ] }
+        
+        try:
+            exec('import apps.' + name, {} )
+        except Exception as e:
+            load_failed(e)
+            return
+        
+        return
+        
     def run_with_own_page(self, name):        
         def load_failed(e):
             gui.DialogBox(Page_Apps.exception_str(e), lv.scr_act())
@@ -215,6 +243,10 @@ class Page_Apps:
         def on_close(obj, evt):
             lv.win.close_event_cb(lv.win.__cast__(obj), evt)                
             if evt == lv.EVENT.CLICKED:
+                if 'llvgl' in sys.modules:
+                    sys.modules['llvgl'].close();
+                    del sys.modules['llvgl']
+                    
                 if self.app_page:
                     if hasattr(self.app_page, "close"):
                         self.app_page.close()
@@ -272,10 +304,12 @@ class Page_Apps:
                 
             # try to figure out if this a simple script or
             # if it implements its own lvgl ui
-            if not self.check_for_page_class(code):
-                self.run_in_console(name, code)
-            else:
+            if self.check_for_page_class(code):
                 self.run_with_own_page(name)
+            elif self.check_for_llvgl_import(code):
+                self.run_with_llvgl(name)
+            else:
+                self.run_in_console(name, code)
 
         # return to default path
         if hasattr(machine, "SDCard"):

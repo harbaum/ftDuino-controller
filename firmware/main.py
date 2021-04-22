@@ -43,11 +43,11 @@ class Screen_Main(lv.obj):
         self.mainpage.set_status(which, what);
             
 try:
-    from ftduino import controller
+    import ftduino
     # beep for "main loaded" 
-    controller.led_yellow(False)
-    controller.led_green(True)
-    controller.beep()
+    ftduino.led_yellow(False)
+    ftduino.led_green(True)
+    ftduino.beep()
 except:
     pass
     

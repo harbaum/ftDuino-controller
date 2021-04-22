@@ -146,7 +146,7 @@ class Page_WiFi:
             
             if ok:
                 self.screen.set_status("wifi", True);
-            
+
                 self.write_key(ssid, password)
 
                 self.ssids.set_show_selected(True)
@@ -166,8 +166,7 @@ class Page_WiFi:
 
                 import espidf
                 if espidf.mdns_init() == 0:
-                    espidf.mdns_hostname_set('ftduino32')            
-                    
+                    espidf.mdns_hostname_set('ftduino32')
             else:
                 self.label.set_text("Connection failed");
                 
@@ -223,7 +222,7 @@ class Page_WiFi:
 
     def write_key(self, ssid, key):
         config = self.read_wifi_config()
-        if not ssid in config["keys"]:
+        if not ssid in config["keys"] or config["last"] != ssid:
             config["keys"][ssid] = key
             config["last"] = ssid
             try:

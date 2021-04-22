@@ -222,3 +222,40 @@ td, th {
     width: 240px;
     height: 320px;
 }
+
+/* experimenting with toolbox visibility */
+/*
+.blocklyToolboxDiv {
+    transition: margin-left 1s ease-out;
+    margin-left: -104px;
+}
+
+.blocklyFlyout, .blocklyFlyoutScrollbar {
+    transition: margin-left 1s ease-out;
+    margin-left: -104px;
+}
+
+.blocklyToolboxDiv:hover, .blocklyToolboxDiv:hover ~ .blocklyFlyout, .blocklyToolboxDiv:hover ~ .blocklyFlyoutScrollbar {
+    transition: margin-left 0.2s ease-out;
+    margin-left: 0px;
+    background-color: red;
+}
+
+.blocklyFlyout:hover {
+    transition: margin-left 0.2s ease-out;
+    margin-left: 0px;
+    background-color: yellow;
+}
+
+.blocklyFlyout:hover ~ .blocklyToolboxDiv {
+    transition: margin-left 0.2s ease-out;
+    margin-left: 0px;
+    background-color: blue;
+}
+*/
+
+/* undo some picnic settings that affect blockly */ 
+.blocklyDropDownDiv {
+    z-index: 10001;
+    line-height: 0;
+}

@@ -115,3 +115,4 @@ class Page:
         self.slider.set_range(10, 200)
         self.slider.set_value(self.chart.factor, 0)
         self.slider.set_event_cb(on_slider_changed)
+

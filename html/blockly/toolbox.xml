@@ -1,69 +1,68 @@
 <xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display: none">
-  <category name="LVGL" colour="0">
-    <block type="lvgl_page"></block>
-      <block type="lvgl_object"></block>
-      <block type="lvgl_set_text">
-	<value name="text">
-          <shadow type="text"></shadow>
-	</value>
-      </block>
-      <block type="lvgl_get_value"></block>
-      <block type="lvgl_set_value">
-	<value name="VALUE"> 
-          <shadow type="math_number">
-	    <field name="NUM">10</field>
-	  </shadow>
-	</value>
-      </block>
-      <block type="lvgl_set_colour">
-	<value name="COLOUR"> 
+  <category name="L²VGL" colour="0">
+    <block type="llvgl_window_set_title">
+      <value name="TEXT">
+        <shadow type="text"></shadow>
+      </value>
+    </block>
+    <block type="llvgl_window_set_background"></block>
+    <block type="llvgl_object"></block>
+    <block type="llvgl_set_text">
+      <value name="text">
+        <shadow type="text"></shadow>
+      </value>
+    </block>
+    <block type="llvgl_set_colour">
+      <value name="COLOUR"> 
           <shadow type="colour_picker"></shadow>
 	</value>
-      </block>
-      <block type="lvgl_align">
-	<value name="COORDINATE">
-          <block type="lvgl_coordinate">
-	    <value name="X">
-              <shadow type="math_number">
-		<field name="NUM">0</field>
-              </shadow>
-	    </value>
-	    <value name="Y">
-              <shadow type="math_number">
-		<field name="NUM">0</field>
-              </shadow>
-	    </value>
-          </block>
-	</value>
-      </block>
-      <block type="lvgl_set_size">
-	<value name="SIZE">
-          <block type="lvgl_coordinate">
-	    <value name="X">
-              <shadow type="math_number">
-		<field name="NUM">0</field>
-              </shadow>
-	    </value>
-	    <value name="Y">
-              <shadow type="math_number">
-		<field name="NUM">0</field>
-              </shadow>
-	    </value>
-          </block>
-	</value>
-      </block>
-      <block type="lvgl_set_width">
-	<value name="WIDTH">
-          <shadow type="math_number">
-	    <field name="NUM">200</field>
-	  </shadow>
-	</value>
-      </block>
-      <block type="lvgl_event"></block>
-      <block type="lvgl_on_event"></block>
-      <block type="lvgl_task"></block>
-      <block type="lvgl_add_series"></block>
+    </block>
+    <block type="llvgl_align">
+      <value name="COORDINATE">
+        <block type="llvgl_coordinate">
+	  <value name="X">
+            <shadow type="math_number">
+	      <field name="NUM">0</field>
+            </shadow>
+	  </value>
+	  <value name="Y">
+            <shadow type="math_number">
+	      <field name="NUM">0</field>
+            </shadow>
+	  </value>
+        </block>
+      </value>
+    </block>
+    <block type="llvgl_set_size">
+      <value name="SIZE">
+        <block type="llvgl_coordinate">
+	  <value name="X">
+            <shadow type="math_number">
+	      <field name="NUM">100</field>
+            </shadow>
+	  </value>
+	  <value name="Y">
+            <shadow type="math_number">
+	      <field name="NUM">20</field>
+            </shadow>
+	  </value>
+        </block>
+      </value>
+    </block>
+    <block type="llvgl_get_value"></block>
+    <block type="llvgl_set_value">
+      <value name="VALUE"> 
+        <shadow type="math_number">
+	  <field name="NUM">1</field>
+	</shadow>
+      </value>
+    </block>
+    <category name="Events" colour="0">
+      <block type="llvgl_on_event"></block>
+      <block type="llvgl_task"></block>
+    </category>
   </category>
+
   <category name="ftDuino" colour="90">
     <block type="ftduino_i2c_scan"></block>
     <block type="ftduino_set_addr">
@@ -89,6 +88,7 @@
     </block>
   </category>
   <category name="Misc" colour="60">
+    <block type="start"></block>
     <block type="delay">
       <value name="TIME">
         <shadow type="math_number">
@@ -105,6 +105,7 @@
     <block type="logic_negate"></block>
     <block type="logic_boolean"></block>
     <block type="logic_ternary"></block>
+    <block type="logic_null"></block>
   </category>
   <category name="Loops" colour="%{BKY_LOOPS_HUE}">
     <block type="controls_repeat_ext">
