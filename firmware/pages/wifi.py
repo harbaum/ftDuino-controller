@@ -65,7 +65,8 @@ class Page_WiFi:
         self.page = page
         self.screen = screen
         self.server = None
-
+        self.wlan = network.WLAN(network.STA_IF)
+        
         # use relative path on unix, absolute root else
         if hasattr(network, "UNIX"):
             self.config_file = "wifi.json"
@@ -73,7 +74,7 @@ class Page_WiFi:
             self.config_file = "/wifi.json"
         
         # read network config if possible
-        config = self.read_wifi_config()
+        self.config = self.read_wifi_config()
         
         # create dropdown, but disable it for now
         self.ssids = lv.dropdown(page)
@@ -82,9 +83,9 @@ class Page_WiFi:
         self.ssids.set_event_cb(self.on_ssid)
 
         # pre-populate list from stored wifi data if present
-        if len(config["keys"]) > 0:
-            ssids = list(config["keys"].keys())
-            self.networks = [ { "ssid": x, "open": not config["keys"][x]} for x in ssids]
+        if len(self.config["keys"]) > 0:
+            ssids = list(self.config["keys"].keys())
+            self.networks = [ { "ssid": x, "open": not self.config["keys"][x]} for x in ssids]
             self.set_ssid_list(ssids)
         else:
             self.ssids.set_options("")
@@ -109,14 +110,14 @@ class Page_WiFi:
         self.label.align(page, lv.ALIGN.IN_TOP_MID, 0, 60)
 
         # enable wlan
-        self.wlan = network.WLAN(network.STA_IF)
         self.wlan.active(True)
-        
+        self.wlan.config(dhcp_hostname=self.config["name"])
+
         # check if there is info about a last successfully
         # used network
-        if "last" in config:
-            print("Trying last network",config["last"],"...")
-            self.connect(config["last"])
+        if "last" in self.config:
+            print("Trying last network",self.config["last"],"...")
+            self.connect(self.config["last"])
 
     def set_ssid_list(self, ssids):
         self.ssids.set_text("Select ...")        
@@ -156,7 +157,7 @@ class Page_WiFi:
                     if self.networks[i]["ssid"] == ssid:
                         self.ssids.set_selected(i)
                 
-                self.label.set_text("Connected\n\nSSID: "+ssid+"\nIP: "+self.wlan.ifconfig()[0]+"\nMDNS: ftduino32.local");
+                self.label.set_text("Connected\n\nSSID: "+ssid+"\nIP: "+self.wlan.ifconfig()[0]+"\n"+self.config["name"]+".local");
                 
                 try:
                     self.server = http_server()
@@ -166,7 +167,7 @@ class Page_WiFi:
 
                 import espidf
                 if espidf.mdns_init() == 0:
-                    espidf.mdns_hostname_set('ftduino32')
+                    espidf.mdns_hostname_set(self.config["name"])
             else:
                 self.label.set_text("Connection failed");
                 
@@ -212,22 +213,27 @@ class Page_WiFi:
         try:
             with open(self.config_file) as fp:
 	        config = ujson.loads(fp.read())
-            return config
         except Exception as e:
             config = { }
 
         if not "keys" in config:
             config["keys"] = {}
+
+        if not "name" in config:
+            mac = self.wlan.config('mac')
+            config["name"] = "ftDuino32-%0.2X%0.2X%0.2X" % (mac[3],mac[4],mac[5])
+
+        self.screen.set_device_name(config["name"]);
+            
         return config
 
     def write_key(self, ssid, key):
-        config = self.read_wifi_config()
-        if not ssid in config["keys"] or config["last"] != ssid:
-            config["keys"][ssid] = key
-            config["last"] = ssid
+        if not ssid in self.config["keys"] or self.config["last"] != ssid:
+            self.config["keys"][ssid] = key
+            self.config["last"] = ssid
             try:
                 with open(self.config_file, 'w') as fp:
-                    ujson.dump(config, fp)
+                    ujson.dump(self.config, fp)
             except Exception as e:
                 print("Error:", e)
     
@@ -239,9 +245,8 @@ class Page_WiFi:
         self.ssids.set_click(False);      
         self.scan_btn.set_click(False);
                 
-        config = self.read_wifi_config()        
-        if ssid in config["keys"]:
-            self.connect_with_key(ssid, config["keys"][ssid])
+        if ssid in self.config["keys"]:
+            self.connect_with_key(ssid, self.config["keys"][ssid])
             return
         
         def keyEntered(key):

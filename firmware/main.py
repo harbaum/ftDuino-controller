@@ -41,7 +41,12 @@ class Screen_Main(lv.obj):
     def set_status(self, which, what):
         # status is being displayed on the main page
         self.mainpage.set_status(which, what);
-            
+
+    def set_device_name(self, name):
+        # device name as being displayed on the main page and being used
+        # for DHCP, MDNS etc ...
+        self.mainpage.set_device_name(name)
+        
 try:
     import ftduino
     # beep for "main loaded" 

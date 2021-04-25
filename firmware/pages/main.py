@@ -10,13 +10,18 @@ class Page_Main:
     def __init__(self, page):
         self.page = page
 
+        # display ftDuino32 "title"
         label = lv.label(page)
         label.set_recolor(True);
         label.set_text("#ff0000 f##0000ff t##00664c Duino#32")
         style = lv.style_t()
         style.set_text_font(lv.STATE.DEFAULT, lv.font_montserrat_16)
         label.add_style(lv.label.PART.MAIN, style)
-        label.align(page, lv.ALIGN.CENTER, 0, -80)
+        label.align(page, lv.ALIGN.CENTER, 0, -100)
+
+        # display user definabled device name
+        self.dname = lv.label(page)
+        self.set_device_name("ftDuino32")
 
         # display release
         rlabel = lv.label(page)
@@ -57,6 +62,10 @@ class Page_Main:
             self.status[i].add_style(lv.label.PART.MAIN, labelstyle)
             self.status[i].align(page, lv.ALIGN.CENTER, 16-32*self.ICONS.index(i), 100)
 
+    def set_device_name(self, name):
+        self.dname.set_text(name)
+        self.dname.align(self.page, lv.ALIGN.CENTER, 0, -70)
+            
     def set_status(self, which, what):
         labelstyle = lv.style_t()
         if what:
