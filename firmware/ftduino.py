@@ -64,16 +64,65 @@ class INPUT_VALUE:
     I7 = 0x1c
     I8 = 0x1e
 
-def i2c_write(bus, addr, reg, value):
+class I2C_TYPE:
+    BYTE = 0x00
+    INT16LE = 0x01
+    INT32LE = 0x02
+    INT16BE = 0x03
+    INT32BE = 0x04
+    
+def i2c_write(bus, addr, reg, type, value):
+    # try to get array length
     try:
-        bus.writeto_mem(addr, reg, bytearray([int(value)]));
+        cnt = len(value)
     except:
-        # ftDuino write failed, silently return anyway
-        pass
+        value = [ value ]
 
-def i2c_read16(bus, addr, reg):
+    data = bytearray()        
+    for v in value:
+        if type == I2C_TYPE.BYTE:
+            data.extend(bytearray([int(v)]))
+        elif type == I2C_TYPE.INT16LE:
+            data.extend((v).to_bytes(2, 'little'))
+        elif type == I2C_TYPE.INT32LE:
+            data.extend((v).to_bytes(4, 'little'))
+        elif type == I2C_TYPE.INT16BE:
+            data.extend((v).to_bytes(2, 'big'))
+        elif type == I2C_TYPE.INT32BE:
+            data.extend((v).to_bytes(4, 'big'))
+
+    if len(data):
+        try:
+            bus.writeto_mem(addr, reg, data);
+        except:
+            # ftDuino write failed, silently return anyway
+            pass
+
+def i2c_read(bus, addr, reg, type, num):
+    # get type size
+    if type == I2C_TYPE.INT16LE or type == I2C_TYPE.INT16BE:
+        size = 2
+    elif type == I2C_TYPE.INT32LE or type == I2C_TYPE.INT32BE:
+        size = 4
+    else:
+        size = 1
+        
     try:
-        return int.from_bytes(bus.readfrom_mem(addr, reg, 2), 'little')
+        bytes = bus.readfrom_mem(addr, reg, size * num)
     except:
         # ftDuino read failed, silently return anyway
-        return 0
+        return None
+
+    value = [ ]
+    for i in range(num):
+        bs = bytes[i*size:(i+1)*size]
+        if type == I2C_TYPE.BYTE or type == I2C_TYPE.INT16LE or type == I2C_TYPE.INT32LE:
+            value.append(int.from_bytes(bs, 'little'))
+        elif type == I2C_TYPE.INT16BE or type == I2C_TYPE.INT32BE:
+            value.append(int.from_bytes(bs, 'big'))
+
+    # don't return single values as array
+    if len(value) == 1:
+        value = value[0]
+    
+    return value

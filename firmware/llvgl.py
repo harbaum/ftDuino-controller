@@ -12,7 +12,6 @@
 # TODO:
 # - Use full content area
 # - set sane default sizes
-# - dark close button bg
 # - adjust gauge style on resize
 
 import sys
@@ -67,6 +66,7 @@ class TYPE:
     LED = 6
     GAUGE = 7
     CHART = 8
+    DROPDOWN = 9
     
 # parse a color from blockly to lvgl. Blockly calls
 # them colour, lvgl color :-)
@@ -75,10 +75,13 @@ def blockly_to_lvgl_color(colour):
 
 def window_set_title(title, colour = None):
     win = sys.modules['llvgl'].config["win"]
+    close_btn = sys.modules['llvgl'].config["close_btn"]
     win.set_title(title)
 
     if colour:
         win.set_style_local_bg_color(lv.win.PART.HEADER, lv.STATE.DEFAULT, blockly_to_lvgl_color(colour))
+        dark = lv.color_t.color_darken(blockly_to_lvgl_color(colour), lv.OPA._50)
+        close_btn.set_style_local_bg_color(lv.obj.PART.MAIN, lv.STATE.PRESSED, dark)
     
 def window_set_content_color(colour):
     content = sys.modules['llvgl'].config["win"].get_content()
@@ -116,8 +119,10 @@ def widget_new(type, parm = None):
         lv_obj = lv.chart(content)
         # leds default size is a little big for the 240x320 screen
         lv_obj.set_size(180,180)
+    elif type == TYPE.DROPDOWN:
+        lv_obj = lv.dropdown(content)
     else:
-        print("Unknown TYPE");
+        print("Unknown type:", type);
         return None
 
     # add new object to internal list
@@ -159,15 +164,24 @@ def update_alignment(obj):
 def widget_set_text(obj, text):
     if not obj in sys.modules['llvgl'].config["objects"]: return
     if not text: return;
+
+    # text may actually be an array of texts
+    if isinstance(text, str):
+        text = [ text ]
     
+    if len(text) < 1: return
+        
+    lv_obj = obj["lv_obj"]    
     if obj["type"] == TYPE.LABEL or obj["type"] == TYPE.CHECKBOX:
-        obj["lv_obj"].set_text(text)
+        lv_obj.set_text(text[0])
     elif obj["type"] == TYPE.BUTTON:
         # make sure there is a label in that button
         if not "lv_label" in obj:
-            obj["lv_label"] = lv.label(obj["lv_obj"])
+            obj["lv_label"] = lv.label(lv_obj)
             
-        obj["lv_label"].set_text(text)
+        obj["lv_label"].set_text(text[0])
+    elif obj["type"] == TYPE.DROPDOWN:
+        lv_obj.set_options("\n".join(text))
 
     # setting the text may resize the object and we need to re-apply alignment
     update_alignment(obj)
@@ -215,11 +229,18 @@ def widget_set_colour(obj, colour):
     except:
         color = [ blockly_to_lvgl_color(colour) ]    
 
+    if len(color) < 1: return
+    
     # prepare some useful colors
     light = lv.color_t.color_lighten(color[0], lv.OPA._30)
     dark = lv.color_t.color_darken(color[0], lv.OPA._20)
     darker = lv.color_t.color_darken(color[0], lv.OPA._50)
-
+  
+    text = None
+    if lv.color_t.color_brightness(color[0]) < 128:
+        text = lv.color_hex(0xffffff)
+        darktext = lv.color_hex(0xd0d0d0)
+    
     # use color depending on object type. We have disabled focus highlighting, so
     # we don't care for focus colors
     lv_obj = obj["lv_obj"]    
@@ -230,6 +251,9 @@ def widget_set_colour(obj, colour):
 	lv_obj.set_style_local_border_color(lv.btn.PART.MAIN, lv.STATE.DEFAULT, dark)
 	lv_obj.set_style_local_bg_color(lv.btn.PART.MAIN, lv.STATE.PRESSED, dark)
 	lv_obj.set_style_local_border_color(lv.btn.PART.MAIN, lv.STATE.PRESSED, darker)
+        if text:
+            lv_obj.set_style_local_text_color(lv.btn.PART.MAIN, lv.STATE.DEFAULT, text)
+            lv_obj.set_style_local_text_color(lv.btn.PART.MAIN, lv.STATE.PRESSED, darktext)
     elif obj["type"] == TYPE.SWITCH:
         lv_obj.set_style_local_bg_color(lv.switch.PART.KNOB, lv.STATE.DEFAULT, color[0])
         lv_obj.set_style_local_bg_color(lv.switch.PART.INDIC, lv.STATE.DEFAULT, dark)
@@ -257,6 +281,18 @@ def widget_set_colour(obj, colour):
             obj["series"].append(lv_obj.add_series(c))
     elif obj["type"] == TYPE.GAUGE:
 	lv_obj.set_needle_count(len(color), color)
+    elif obj["type"] == TYPE.DROPDOWN:
+	lv_obj.set_style_local_bg_color(lv.dropdown.PART.MAIN, lv.STATE.DEFAULT, color[0])
+	lv_obj.set_style_local_border_color(lv.dropdown.PART.MAIN, lv.STATE.DEFAULT, dark)
+	lv_obj.set_style_local_bg_color(lv.dropdown.PART.MAIN, lv.STATE.PRESSED,  dark)
+	lv_obj.set_style_local_border_color(lv.dropdown.PART.MAIN, lv.STATE.PRESSED, darker)
+	lv_obj.set_style_local_border_color(lv.dropdown.PART.MAIN, lv.STATE.FOCUSED, darker)
+	lv_obj.set_style_local_bg_color(lv.dropdown.PART.SELECTED, lv.STATE.DEFAULT, color[0])
+
+        # toggle between black and white color based on the darkness of the given color
+        if text:
+            lv_obj.set_style_local_text_color(lv.dropdown.PART.MAIN, lv.STATE.DEFAULT, text)
+            lv_obj.set_style_local_text_color(lv.dropdown.PART.MAIN, lv.STATE.PRESSED, darktext)
     else:
         print("set color not supported");
 
@@ -329,6 +365,8 @@ def widget_set_value(obj, value, animate = False):
     elif obj["type"] == TYPE.GAUGE:
         for i in range(len(values)):
             lv_obj.set_value(i, values[i])
+    elif obj["type"] == TYPE.DROPDOWN:
+        lv_obj.set_selected(value)
 
 def widget_get_value(obj):
     if not obj in sys.modules['llvgl'].config["objects"]: return
@@ -339,6 +377,8 @@ def widget_get_value(obj):
 	return lv_obj.get_state()
     elif obj["type"] == TYPE.SLIDER:
 	return lv_obj.get_value() 
+    elif obj["type"] == TYPE.DROPDOWN:
+        return lv_obj.get_selected()
     return None
 
 # -----------------------------------------------------------------------------
@@ -430,10 +470,10 @@ if __name__ == "__main__":
         # add close button to the header
         close_btn = win.add_btn_right(lv.SYMBOL.CLOSE)
         close_btn.set_event_cb(on_close)
-
+        
         # make windows availabel to all llvgl instances
         import llvgl
-        sys.modules['llvgl'].config = { "win": win, "objects": [ ] }
+        sys.modules['llvgl'].config = { "win": win, "close_btn": close_btn, "objects": [ ] }
         
         exec('import ' + name, {} )
 

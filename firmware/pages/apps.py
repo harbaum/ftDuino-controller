@@ -199,7 +199,7 @@ class Page_Apps:
 
         # make window available to all llvgl instances
         import llvgl
-        sys.modules['llvgl'].config = { "win": self.win, "objects": [ ] }
+        sys.modules['llvgl'].config = { "win": self.win, "close_btn": self.close_btn, "objects": [ ] }
         
         try:
             exec('import apps.' + name, {} )

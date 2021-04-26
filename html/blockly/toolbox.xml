@@ -33,6 +33,13 @@
         </block>
       </value>
     </block>
+    <block type="llvgl_align_to">
+      <value name="COORDINATE">
+        <shadow type="math_number">
+	  <field name="NUM">0</field>
+        </shadow>
+      </value>
+    </block>
     <block type="llvgl_set_size">
       <value name="SIZE">
         <block type="llvgl_coordinate">
@@ -86,6 +93,8 @@
         </shadow>
       </value>
     </block>
+    <block type="i2c_read"></block>
+    <block type="i2c_write"></block>
   </category>
   <category name="Misc" colour="60">
     <block type="start"></block>
