@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in boot.py main.py ftduino.py gui.py llvgl.py http_server.py ; do
+for i in boot.py main.py ftduino.py gui.py llvgl.py mqtt.py http_server.py ; do
     echo "Put $i ..."
     ampy put $i $i
 done
