@@ -18,6 +18,11 @@ def beep(freq=440, duration=0.1):
     sleep(duration)
     pwm.deinit()
 
+def get_name():
+    # if the GUI is running this should return the name
+    # used for the WIFI. Otherwise it just returns ftDuino32    
+    print("GET NAME");
+    
 class OUTPUT_MODE:
     O1 = 0x00
     O2 = 0x02

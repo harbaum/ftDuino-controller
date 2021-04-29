@@ -87,6 +87,9 @@ def window_set_content_color(colour):
     content = sys.modules['llvgl'].config["win"].get_content()
     content.set_style_local_bg_color(lv.obj.PART.MAIN, lv.STATE.DEFAULT, blockly_to_lvgl_color(colour))
 
+def window_on_close(cb):
+    sys.modules['llvgl'].config["close_cb"] = cb
+    
 def on_event(obj, evt):
     if "events" in obj and evt in obj["events"]:
         obj["events"][evt](obj, evt);
@@ -412,6 +415,10 @@ def timer_stop(t):
     sys.modules['llvgl'].config["timer"].remove(t)
 
 def close():
+    # call user provided close function
+    if "close_cb" in sys.modules['llvgl'].config:
+        sys.modules['llvgl'].config["close_cb"]()
+    
     # stop all timer tasks
     if "timer" in sys.modules['llvgl'].config:
         for t in sys.modules['llvgl'].config["timer"]:

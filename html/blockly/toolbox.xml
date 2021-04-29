@@ -67,6 +67,7 @@
     <category name="Events" colour="0">
       <block type="llvgl_on_event"></block>
       <block type="llvgl_task"></block>
+      <block type="llvgl_on_window_close"></block>
     </category>
   </category>
 
@@ -105,6 +106,10 @@
         </shadow>
       </value>
     </block>
+    <block type="mqtt_connect"></block>
+    <block type="mqtt_disconnect"></block>
+    <block type="mqtt_publish"></block>
+    <block type="mqtt_subscribe"></block>
   </category>
   <sep></sep>
   <category name="Logic" colour="%{BKY_LOGIC_HUE}">

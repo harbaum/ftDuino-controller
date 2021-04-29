@@ -44,7 +44,60 @@ var customBlocks = [
 	"nextStatement": null,
 	"colour": Code.color_misc
     },
-	
+
+    {
+	"type": "mqtt_connect",
+	"message0": "MQTT connect %1",
+	"args0": [ {
+	    "type": "field_input",
+	    "name": "NAME",
+	    "text": "mqtt_server"
+	} ],
+	"output": "Boolean",
+	"colour": Code.color_misc
+    }, {
+	"type": "mqtt_disconnect",
+	"message0": "MQTT disconnect",
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_misc
+    }, {
+	"type": "mqtt_publish",
+	"message0": "MQTT publish %1 %2",
+	"args0": [ {
+	    "type": "field_input",
+	    "name": "TOPIC",
+	    "text": "topic"
+	}, {
+	    "type": "input_value",
+	    "name": "MESSAGE",
+	    "check": "String"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_misc
+    }, {
+	"type": "mqtt_subscribe",
+	"message0": "MQTT subscribe %1 %2 on %3 %4",
+	"args0": [ {
+	    "type": "field_input",
+	    "name": "TOPIC",
+	    "text": "topic"
+	}, {
+	    "type": "input_dummy"
+	}, {
+	    "type": "field_variable",
+	    "name": "MESSAGE",
+	    "variable": "message"
+	}, {
+	    "type": "input_statement",
+	    "name": "STATEMENTS"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_misc
+    },
+    
     // --------------- LLVGL ---------------
     {
 	"type": "llvgl_window_set_title",
@@ -277,6 +330,16 @@ var customBlocks = [
 	} ],
 	"previousStatement": null,
 	"nextStatement": null,
+	"colour": Code.color_llvgl
+    }, {
+	"type": "llvgl_on_window_close",
+	"message0": "on window close %1 %2",
+	"args0": [ {
+	    "type": "input_dummy"
+	}, {
+	    "type": "input_statement",
+	    "name": "STATEMENTS"
+	} ],
 	"colour": Code.color_llvgl
     },
     
@@ -1382,6 +1445,14 @@ function toolbox_install(toolboxText) {
 	return "";
     };
 
+    Blockly.Python['llvgl_on_window_close'] = function(block) {
+	Blockly.Python.definitions_['from_llvgl_import_all'] = "from llvgl import *";
+	var statements = Blockly.Python.statementToCode(block, 'STATEMENTS');
+	var code = "def on_window_close():\n"+getGlobal(block, "    ")+statements + '\n' +
+	    'window_on_close(on_window_close)\n';
+	return code;
+    };
+
     Blockly.Python['llvgl_set_text'] = function(block) {
 	Blockly.Python.definitions_['from_llvgl_import_all'] = "from llvgl import *";
 	var variable_object = Blockly.Python.variableDB_.getName(block.getFieldValue('object'), Blockly.Variables.NAME_TYPE);
@@ -1556,8 +1627,45 @@ function toolbox_install(toolboxText) {
 	var code = value_value + " in " + value_list;
 	return [code, Blockly.Python.ORDER_NONE];
     };
+
+    /****************************************************************/
+    /********************          mqtt        **********************/
+    /****************************************************************/
+
+    Blockly.Python['mqtt_connect'] = function(block) {
+	Blockly.Python.definitions_['from mqtt import mqtt'] = "from mqtt import mqtt";
+	var name = block.getFieldValue('NAME');
+	var code = 'mqtt.connect("' + name + '")';
+	return [code, Blockly.Python.ORDER_FUNCTION_CALL];
+    };
     
-    // Pyhton should be indeted by 4 spaces
+    Blockly.Python['mqtt_disconnect'] = function(block) {
+	Blockly.Python.definitions_['from mqtt import mqtt'] = "from mqtt import mqtt";
+	return "mqtt.disconnect()\n";
+    };
+    
+    Blockly.Python['mqtt_publish'] = function(block) {
+	Blockly.Python.definitions_['from mqtt import mqtt'] = "from mqtt import mqtt";
+	var topic = block.getFieldValue('TOPIC');
+	var message = Blockly.Python.valueToCode(block, 'MESSAGE', Blockly.Python.ORDER_ATOMIC);
+	var code = "mqtt.publish('"+topic+"', "+message+")\n";
+	return code;
+    };
+
+    Blockly.Python['mqtt_subscribe'] = function(block) {
+	Blockly.Python.definitions_['from mqtt import mqtt'] = "from mqtt import mqtt";
+	var topic = block.getFieldValue('TOPIC');
+	var message = Blockly.Python.variableDB_.getName(block.getFieldValue('MESSAGE'), Blockly.Variables.NAME_TYPE);
+	var statements = Blockly.Python.statementToCode(block, 'STATEMENTS');
+	var code = "def on_mqtt_" + topic + 
+	    "("+message+"):\n"+getGlobal(block, "    ", message)+statements + '\n';
+
+	Blockly.Python.definitions_["on_mqtt_"+topic] = code;
+	
+	return "mqtt.subscribe('"+topic+"', on_mqtt_"+topic+")\n";
+    };
+    
+    // Python should be indented by 4 spaces
     Blockly.Python.INDENT = "    ";
 }
 
@@ -1587,6 +1695,10 @@ function upload() {
     Code.task_counter = 0;  // restart task count
     var python_code = Blockly.Python.workspaceToCode(Code.workspace);
 
+    // if the workspace contains llvgl as well as mqtt, then close the
+    // connection when window is being closed
+    // TODO ...
+    
     // generate xml to post it with the python code
     var blockly_dom = Blockly.Xml.workspaceToDom(Code.workspace);
     var blockly_code = Blockly.Xml.domToText(blockly_dom);
