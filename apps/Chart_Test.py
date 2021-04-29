@@ -9,8 +9,8 @@ chart = None
 
 window_set_title('Chart Test', "#006600")
 window_set_content_color("#ffcc99")
-ftduino.i2c_write(i2cBus, 43, ftduino.INPUT_MODE.I1, ftduino.INPUT_MODE.R)
-ftduino.i2c_write(i2cBus, 43, ftduino.INPUT_MODE.I2, ftduino.INPUT_MODE.R)
+ftduino.i2c_write(i2cBus, 43, ftduino.INPUT_MODE.I1, ftduino.I2C_TYPE.BYTE, ftduino.INPUT_MODE.R)
+ftduino.i2c_write(i2cBus, 43, ftduino.INPUT_MODE.I2, ftduino.I2C_TYPE.BYTE, ftduino.INPUT_MODE.R)
 label = widget_new(TYPE.LABEL);
 widget_set_text(label, 'I1 & I2 resistance');
 widget_set_align(label, None, ALIGN.IN_TOP_MID, 0, 20);

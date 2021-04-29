@@ -141,3 +141,4 @@ class Page:
         # the line drawing is done by a task so it doesn't interfere
         # with LVGL itself
         self.task = lv.task_create(self.line_task, 10, lv.TASK_PRIO.MID, None);
+
