@@ -1,18 +1,25 @@
 from llvgl import *
 from mqtt import mqtt
+import ftduino
+from machine import Pin, I2C
 
+i2cBus = I2C(0,scl=Pin(22),sda=Pin(21))
 button = None
 led = None
 object2 = None
 message = None
+state = None
 
 def on_mqtt_led(message):
-    global button, led, object2
-    widget_set_value(led,(message == 'on'))
+    global button, led, object2, state, i2cBus
+    state = message == 'on'
+    widget_set_value(led,state)
+    ftduino.i2c_write(i2cBus, 43, ftduino.OUTPUT_VALUE.O1, ftduino.I2C_TYPE.BYTE, (255 if state else 0))
 
 # Describe this function...
 def setup_led():
-    global button, led, object2, message
+    global button, led, object2, message, state, i2cBus
+    ftduino.i2c_write(i2cBus, 43, ftduino.OUTPUT_MODE.O1, ftduino.I2C_TYPE.BYTE, ftduino.OUTPUT_MODE.HI)
     led = widget_new(TYPE.LED);
     widget_set_value(led,False)
     widget_set_align(led, button, ALIGN.BELOW, 40);
@@ -21,7 +28,7 @@ def setup_led():
     mqtt.subscribe('led', on_mqtt_led)
 
 def on_button_clicked(button,_e):
-    global led, object2, message
+    global led, object2, message, state, i2cBus
     mqtt.publish('button', 'click')
 
 
@@ -40,7 +47,7 @@ else:
     widget_set_text(object2, 'Connection failed!');
 
 def on_window_close():
-    global button, led, object2, message
+    global button, led, object2, message, state, i2cBus
     mqtt.disconnect()
 
 window_on_close(on_window_close)

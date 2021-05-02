@@ -1,6 +1,6 @@
+from llvgl import *
 import ftduino
 from machine import Pin, I2C
-from llvgl import *
 
 i2cBus = I2C(0,scl=Pin(22),sda=Pin(21))
 label = None
@@ -20,7 +20,7 @@ widget_set_align(chart, None, ALIGN.CENTER, 0, 10);
 widget_set_colour(chart,['#993399', '#cc9933']);
 def __llvgl_task_0(__timer):
     global label, chart, i2cBus
-    widget_set_value(chart,[(ftduino.i2c_read16(i2cBus, 43, ftduino.INPUT_VALUE.I1)) / 47, (ftduino.i2c_read16(i2cBus, 43, ftduino.INPUT_VALUE.I2)) / 47])
+    widget_set_value(chart,[(ftduino.i2c_read(i2cBus, 43, ftduino.INPUT_VALUE.I1, ftduino.I2C_TYPE.INT16LE, 1)) / 47, (ftduino.i2c_read(i2cBus, 43, ftduino.INPUT_VALUE.I2, ftduino.I2C_TYPE.INT16LE, 1)) / 47])
 
 timer_start(0.1, __llvgl_task_0);
 

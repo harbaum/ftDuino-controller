@@ -293,12 +293,13 @@ diff -Naur orig/ports/esp32/boards/GENERIC_SPIRAM/mpconfigboard.mk new/ports/esp
 +SDKCONFIG += boards/sdkconfig.http_server
 diff -Naur orig/ports/esp32/boards/sdkconfig.http_server new/ports/esp32/boards/sdkconfig.http_server
 --- orig/ports/esp32/boards/sdkconfig.http_server	1970-01-01 01:00:00.000000000 +0100
-+++ new/ports/esp32/boards/sdkconfig.http_server	2021-02-10 18:30:28.000000000 +0100
-@@ -0,0 +1,4 @@
++++ new/ports/esp32/boards/sdkconfig.http_server	2021-05-01 15:47:21.174195360 +0200
+@@ -0,0 +1,5 @@
 +# MicroPython on ESP32, ESP IDF configuration for httpd
 +
 +CONFIG_HTTPD_WS_SUPPORT=y
 +CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
++CONFIG_LWIP_MAX_SOCKETS=16
 diff -Naur orig/ports/esp32/Makefile new/ports/esp32/Makefile
 --- orig/ports/esp32/Makefile	2021-02-10 18:25:43.000000000 +0100
 +++ new/ports/esp32/Makefile	2021-02-10 18:26:37.000000000 +0100
