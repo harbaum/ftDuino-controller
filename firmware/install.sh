@@ -11,6 +11,7 @@ for i in pages/main.py pages/wifi.py pages/apps.py; do
 done
 
 ampy mkdir /apps
+cd ..
 for i in apps/*.py apps/*.xml; do
     echo "Put $i ..."
     ampy put $i $i
