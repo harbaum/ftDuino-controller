@@ -199,6 +199,7 @@ class Page_WiFi:
         self.task = lv.task_create(connect_task, 100, lv.TASK_PRIO.MID, None);
         
     def scan_wlan(self):
+        self.wlan.active(True)
         network_scanned = self.wlan.scan()
         networks = [ ]
         
