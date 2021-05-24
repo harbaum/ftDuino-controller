@@ -11,14 +11,16 @@ for Windows.
 
 ## For end users
 
-As an end user you simple run the provided executable (e.g. a windows exe),
+As an end user you simply run the provided executable (e.g. a windows exe),
 select the right COM port, select a ZIP file containing the firmware files
-to install and click "Install..." and wait a few minutes for the installation
+to install, click "Install..." and wait a few minutes for the installation
 to succeed.
+
+All you need is the [latest ZIP and EXE](https://github.com/harbaum/ftDuino32/releases/latest).
 
 ## For developers
 
-As a developer you simply provide the ready-to-run windows executable
+As a developer you provide the ready-to-run windows executable
 together with a prepared ZIP file. The zip file includes all the
 required files together with a [config file](setup.json) that provides
-additional information for the flashing process.
+additional information for the installation process.
