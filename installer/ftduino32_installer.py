@@ -241,6 +241,12 @@ class AmpyThread(QThread):
       ok = False
       retry = 5
 
+      # ctrl-c
+      self.setup["board"].serial.write(b'\r\x03')
+      time.sleep(0.1)
+      self.setup["board"].serial.write(b'\x03')
+      time.sleep(5)
+        
       while not ok and retry:
          # try to get into repl mode. This sometimes needs a retry under windows ...
          try:
@@ -428,7 +434,7 @@ class Window(QMainWindow):
       port = self.get_port();
       
       try:
-         self.setup["ampy"]["board"] = pyboard.Pyboard(port, baudrate=AMPY_BAUD, rawdelay=0)
+         self.setup["ampy"]["board"] = pyboard.Pyboard(port, baudrate=AMPY_BAUD, wait=1, rawdelay=0.1)
          self.setup["ampy"]["ampy_files"] = ampy.files.Files(self.setup["ampy"]["board"])
       except (pyboard.PyboardError, Exception) as e:
          self.alert( { "title": "Error",

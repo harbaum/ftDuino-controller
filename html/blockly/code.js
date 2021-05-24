@@ -613,7 +613,7 @@ function toolbox_install(toolboxText) {
 	    // check if code has a start button. Add one if not
 	    var hasStart = false;
 	    Code.workspace.getTopBlocks().forEach(b => {
-		if(b.type == "start") hasStart = True;
+		if(b.type == "start") hasStart = true;
 	    });
 						  
 	    if(!hasStart) {
