@@ -1,0 +1,127 @@
+{
+    "name": "ftDuino32 firmware setup",
+    "comment": "This is the setup configuration for the ftduino32_installer tool",
+    
+    "esptool": {
+	"baud": 460800,
+	"chip": "esp32",
+	"compress": null,
+	"connect_attempts": 7,
+	"encrypt": false,
+	"encrypt_files": null,
+	"erase_all": false,
+	"flash_freq": "40m",
+	"flash_mode": "dio",
+	"flash_size": "detect",
+	"ignore_flash_encryption_efuse_setting": false,
+	"no_compress": false,
+	"no_progress": false,
+	"no_stub": false,
+	"verify": false,
+	
+	"files": [ {
+	    "addr": 4096,
+	    "filename": "firmware.bin"
+	} ]
+    },
+
+    "ampy": {
+	"files": [
+	    { "filename": "boot.py" },
+	    { "filename": "main.py" },
+	    { "filename": "ftduino.py" },
+	    { "filename": "gui.py" },
+	    { "filename": "llvgl.py" },
+	    { "filename": "mqtt.py" },
+	    { "filename": "http_server.py" },	    
+	    { "filename": "pages",
+	      "comment": "User interface pages",
+	      "files": [
+		  { "filename": "main.py" },
+		  { "filename": "wifi.py" },
+		  { "filename": "apps.py" }	    
+	      ]
+	    },	      
+	    { "filename": "apps",
+	      "comment": "Demo applications",
+	      "files": [
+		  { "filename": "Chart_Demo.py" },
+		  { "filename": "Chart_Test.py" },
+		  { "filename": "Chart_Test.xml" },
+		  { "filename": "GaugeDemo.py" },
+		  { "filename": "GaugeDemo.xml" },
+		  { "filename": "Line_Demo.py" },
+		  { "filename": "LLVGL_Test.py" },
+		  { "filename": "LLVGL_Test.xml" },
+		  { "filename": "MQTT_Demo.py" },
+		  { "filename": "MQTT_Demo.xml" }  
+	      ]
+	    },
+	    { "filename": "html",
+	      "comment": "HTML files",
+	      "files": [
+		  { "filename": "index.html" },
+		  { "filename": "common.js" },
+		  { "filename": "picnic.min.css.gz" },
+		  { "filename": "favicon.ico" },
+		  { "filename": "style.css" },
+		  { "filename": "robots.txt" },
+		  { "filename": "liveview.js" },
+		  { "filename": "zlib_and_gzip.min.js.gz" },
+		  { "filename": "blockly.html" },
+		  { "filename": "cm.html" },
+		  { "filename": "blockly",
+		    "comment": "Blockly files",
+		    "files": [
+			{ "filename": "blockly_compressed.js.gz" },
+			{ "filename": "blocks_compressed.js.gz" },
+			{ "filename": "code.js" },
+			{ "filename": "python_compressed.js.gz" },
+			{ "filename": "toolbox.xml" },
+			{ "filename": "msg",
+			  "comment": "Blockly language files",
+			  "files": [
+			      { "filename": "js",
+				"files": [
+				    { "filename": "en.js.gz" }
+				]
+			      }
+			  ]
+			},
+			{ "filename": "media",
+			  "comment": "Blockly media files",
+			  "files": [
+			      { "filename": "1x1.gif" },
+			      { "filename": "click.ogg" },
+			      { "filename": "delete.mp3" },
+			      { "filename": "delete.wav" },
+			      { "filename": "disconnect.ogg" },
+			      { "filename": "handclosed.cur" },
+			      { "filename": "handopen.cur" },
+			      { "filename": "quote1.png" },
+			      { "filename": "sprites.svg" },
+			      { "filename": "click.mp3" },
+			      { "filename": "click.wav" },
+			      { "filename": "delete.ogg" },
+			      { "filename": "disconnect.mp3" },
+			      { "filename": "disconnect.wav" },
+			      { "filename": "handdelete.cur" },
+			      { "filename": "quote0.png" },
+			      { "filename": "sprites.png" }			      
+			  ]
+			}
+		    ]
+		  },
+		  { "filename": "cm",
+		    "comment": "Codemirror files",
+		    "files": [
+			{ "filename": "codemirror.css" },
+			{ "filename": "codemirror.min.js.gz" },
+			{ "filename": "python.js.gz" }
+		    ]
+		  }
+	      ]
+	    }
+	]
+    }
+}

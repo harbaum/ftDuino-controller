@@ -19,6 +19,6 @@ to succeed.
 ## For developers
 
 As a developer you simply provide the ready-to-run windows executable
-together with a prepared ZIP file. The zip file includes all the required
-files together with a config file that provides additional information
-for the flashing process.
+together with a prepared ZIP file. The zip file includes all the
+required files together with a [config file](setup.json) that provides
+additional information for the flashing process.
