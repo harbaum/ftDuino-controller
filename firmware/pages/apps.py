@@ -117,13 +117,6 @@ class Page_Apps:
     def http_server_poll(self, data):
         cmd = self.screen.http_server_poll()
         if cmd: self.exec_cmd(cmd)
-        #if self.fake_cmd:
-        #    self.exec_cmd(self.fake_cmd)
-        #    self.fake_cmd = None
-
-    #def fake(self, x):
-    #    self.fake_cmd = ("run", False, "hello");
-    #    self.fake_task.set_repeat_count(0);
                     
     def __init__(self, page, screen):
         self.page = page
@@ -239,7 +232,7 @@ class Page_Apps:
             # is available at all
             self.execute(self.button.is_checked(), name);
 
-    def execute(self, is_sd, name):
+    def execute(self, is_sd=None, name=None):
         def on_close(obj, evt):
             lv.win.close_event_cb(lv.win.__cast__(obj), evt)                
             if evt == lv.EVENT.CLICKED:
@@ -275,6 +268,10 @@ class Page_Apps:
 
         # assume app has no own page
         self.app_page = None
+
+        # if no name was supplied then the window was just to be closed
+        # and we are done at this point
+        if not name: return
         
         # if the machine has an sd card, then change
         # into the appropriate dir

@@ -43,6 +43,11 @@ var customBlocks = [
 	"message0": "Start",
 	"nextStatement": null,
 	"colour": Code.color_misc
+    },{
+	"type": "end",
+	"message0": "End",
+	"previousStatement": null,
+	"colour": Code.color_misc
     },
 
     {
@@ -399,6 +404,70 @@ var customBlocks = [
 	    "type": "input_value",
 	    "name": "VALUE",
 	    "check": "Number"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_ftduino
+    }, {
+	"type": "ftduino_output",
+	"message0": "set output %1 %2",
+	"args0": [ {
+	    "type": "field_dropdown",
+	    "name": "PORT",
+	    "options": [ [ "O1", "O1" ],
+			 [ "O2", "O2" ],
+			 [ "O3", "O3" ],
+			 [ "O4", "O4" ],
+			 [ "O5", "O5" ],
+			 [ "O6", "O6" ],
+			 [ "O7", "O7" ],
+			 [ "O8", "O8" ] ]
+	}, {
+	    "type": "input_value",
+	    "name": "VALUE",
+	    "check": "Number"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_ftduino
+    }, {
+	"type": "ftduino_motor",
+	"message0": "run motor %1 %2 %3",
+	"args0": [ {
+	    "type": "field_dropdown",
+	    "name": "PORT",
+	    "options": [ [ "M1", "M1" ],
+			 [ "M2", "M2" ],
+			 [ "M3", "M3" ],
+			 [ "M4", "M4" ] ]
+	}, {
+	    "type": "field_dropdown",
+	    "name": "MODE",
+	    "options": [ [ "LEFT",  "LEFT" ],
+			 [ "RIGHT", "RIGHT" ] ]
+	}, {
+	    "type": "input_value",
+	    "name": "VALUE",
+	    "check": "Number"
+	} ],
+	"previousStatement": null,
+	"nextStatement": null,
+	"colour": Code.color_ftduino
+    }, {
+	"type": "ftduino_motor_stop",
+	"message0": "stop motor %1 %2",
+	"args0": [ {
+	    "type": "field_dropdown",
+	    "name": "PORT",
+	    "options": [ [ "M1", "M1" ],
+			 [ "M2", "M2" ],
+			 [ "M3", "M3" ],
+			 [ "M4", "M4" ] ]
+	}, {
+	    "type": "field_dropdown",
+	    "name": "MODE",
+	    "options": [ [ "OFF",  "OFF" ],
+			 [ "BRAKE", "BRAKE" ] ]
 	} ],
 	"previousStatement": null,
 	"nextStatement": null,
@@ -842,7 +911,6 @@ function toolbox_install(toolboxText) {
     function ftduino_prepare(block) {
 	// make sure the i2c variables have the correct defaults
 	var busVar = Blockly.Python.variableDB_.getName('i2cBus', Blockly.Names.DEVELOPER_VARIABLE_TYPE);
-
 	// check if there's a "set address" block being used.
 	if(Code.workspace.getBlocksByType('ftduino_set_addr', false).length > 0)
 	    var addrVar = Blockly.Python.variableDB_.getName('ftduinoAddress', Blockly.Names.DEVELOPER_VARIABLE_TYPE);
@@ -857,6 +925,7 @@ function toolbox_install(toolboxText) {
 	    switch(v.split("=")[0].trim()) {
 	    case busVar:
 		v = busVar + " = I2C(0,scl=Pin(22),sda=Pin(21))";
+		Blockly.Python.definitions_['from_machine_import_Pin_I2C'] = "from machine import Pin, I2C";		
 		break;
 	    case addrVar:
 		v = addrVar + " = 43 # default i2c client address";
@@ -867,7 +936,6 @@ function toolbox_install(toolboxText) {
 	
 	Blockly.Python.definitions_['variables'] = new_vars.join('\n');
 	Blockly.Python.definitions_['import ftduino'] = "import ftduino";
-	Blockly.Python.definitions_['from_machine_import_Pin_I2C'] = "from machine import Pin, I2C";
 
 	var retval = { bus: busVar, addr: addrVar };	
 	return retval;
@@ -887,7 +955,7 @@ function toolbox_install(toolboxText) {
     };
     
     Blockly.Python['ftduino_output_mode'] = function(block) {
-	var vars = ftduino_prepare(block)	
+	var vars = ftduino_prepare(block)
 	var dropdown_port = block.getFieldValue('PORT');
 	var dropdown_mode = block.getFieldValue('MODE');
 	var code = "ftduino.i2c_write("+ vars["bus"] + ", " + vars["addr"] + ", " + dropdown_port + ', ftduino.I2C_TYPE.BYTE, ' + dropdown_mode+")\n";
@@ -902,6 +970,34 @@ function toolbox_install(toolboxText) {
 	return code;
     };
 
+    Blockly.Python['ftduino_output'] = function(block) {
+	var vars = ftduino_prepare(block)	
+	var dropdown_port = block.getFieldValue('PORT');
+	var value_value = Blockly.Python.valueToCode(block, 'VALUE', Blockly.Python.ORDER_ATOMIC);
+	var code = "ftduino.i2c_write("+ vars["bus"] + ", " + vars["addr"] + ", ftduino.OUTPUT_MODE." + dropdown_port + ', ftduino.I2C_TYPE.BYTE, ftduino.OUTPUT_MODE.HI)\n';
+	var code = code + "ftduino.i2c_write("+ vars["bus"] + ", " + vars["addr"] + ", ftduino.OUTPUT_VALUE." + dropdown_port + ', ftduino.I2C_TYPE.BYTE, ' + value_value+")\n";
+	return code;
+    };
+    
+    Blockly.Python['ftduino_motor'] = function(block) {
+	var vars = ftduino_prepare(block)	
+	var dropdown_port = block.getFieldValue('PORT');
+	var dropdown_mode = block.getFieldValue('MODE');
+	var value_value = Blockly.Python.valueToCode(block, 'VALUE', Blockly.Python.ORDER_ATOMIC);
+	var code = "ftduino.i2c_write("+ vars["bus"] + ", " + vars["addr"] + ", ftduino.MOTOR_MODE." + dropdown_port + ', ftduino.I2C_TYPE.BYTE, ftduino.MOTOR_MODE.' + dropdown_mode+")\n";
+	code = code + "ftduino.i2c_write("+ vars["bus"] + ", " + vars["addr"] + ", ftduino.MOTOR_VALUE." + dropdown_port + ', ftduino.I2C_TYPE.BYTE, ' + value_value+")\n";
+	return code;
+    };
+    
+    Blockly.Python['ftduino_motor_stop'] = function(block) {
+	var vars = ftduino_prepare(block)	
+	var dropdown_port = block.getFieldValue('PORT');
+	var dropdown_mode = block.getFieldValue('MODE');
+	var code = "ftduino.i2c_write("+ vars["bus"] + ", " + vars["addr"] + ", ftduino.MOTOR_MODE." + dropdown_port + ', ftduino.I2C_TYPE.BYTE, ftduino.MOTOR_MODE.' + dropdown_mode+")\n";
+	code = code + "ftduino.i2c_write("+ vars["bus"] + ", " + vars["addr"] + ", ftduino.MOTOR_VALUE." + dropdown_port + ', ftduino.I2C_TYPE.BYTE, 255)\n';
+	return code;
+    };
+    
     Blockly.Python['ftduino_input_mode'] = function(block) {
 	var vars = ftduino_prepare(block)
 	var dropdown_port = block.getFieldValue('PORT');
@@ -923,6 +1019,7 @@ function toolbox_install(toolboxText) {
 	var reg = block.getFieldValue('REG');
 	var type = block.getFieldValue('TYPE');
 	var value = Blockly.Python.valueToCode(block, 'VALUE', Blockly.Python.ORDER_ATOMIC);
+	if(value == "") value = "None"
 	var code = "ftduino.i2c_write("+vars["bus"]+", "+addr+", "+reg+", "+type+", "+value+")\n";
 	return code;
     };
@@ -942,6 +1039,10 @@ function toolbox_install(toolboxText) {
     /****************************************************************/
 
     Blockly.Python['start'] = function(block) {
+	return "";
+    };
+
+    Blockly.Python['end'] = function(block) {
 	return "";
     };
     

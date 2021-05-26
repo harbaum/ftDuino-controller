@@ -36,6 +36,22 @@ class OUTPUT_MODE:
     HI  = 0x01
     LOW = 0x02
 
+class MOTOR_VALUE:
+    M1    = 0x01
+    M2    = 0x05
+    M3    = 0x09
+    M4    = 0x0d
+    
+class MOTOR_MODE:
+    M1    = 0x00
+    M2    = 0x04
+    M3    = 0x08
+    M4    = 0x0c
+    OFF   = 0x10
+    BRAKE = 0x11
+    LEFT  = 0x12
+    RIGHT = 0x13
+    
 class OUTPUT_VALUE:
     O1 = 0x01
     O2 = 0x03
@@ -85,23 +101,24 @@ def i2c_write(bus, addr, reg, type, value):
 
     data = bytearray()        
     for v in value:
-        if type == I2C_TYPE.BYTE:
-            data.extend(bytearray([int(v)]))
-        elif type == I2C_TYPE.INT16LE:
-            data.extend((v).to_bytes(2, 'little'))
-        elif type == I2C_TYPE.INT32LE:
-            data.extend((v).to_bytes(4, 'little'))
-        elif type == I2C_TYPE.INT16BE:
-            data.extend((v).to_bytes(2, 'big'))
-        elif type == I2C_TYPE.INT32BE:
-            data.extend((v).to_bytes(4, 'big'))
+        if v != None:    
+            if type == I2C_TYPE.BYTE:
+                data.extend(bytearray([int(v)]))
+            elif type == I2C_TYPE.INT16LE:
+                data.extend((v).to_bytes(2, 'little'))
+            elif type == I2C_TYPE.INT32LE:
+                data.extend((v).to_bytes(4, 'little'))
+            elif type == I2C_TYPE.INT16BE:
+                data.extend((v).to_bytes(2, 'big'))
+            elif type == I2C_TYPE.INT32BE:
+                data.extend((v).to_bytes(4, 'big'))
 
-    if len(data):
-        try:
-            bus.writeto_mem(addr, reg, data);
-        except:
-            # ftDuino write failed, silently return anyway
-            pass
+        if len(data):
+            try:
+                bus.writeto_mem(addr, reg, data);
+            except:
+                # ftDuino write failed, silently return anyway
+                pass
 
 def i2c_read(bus, addr, reg, type, num):
     # get type size
@@ -131,3 +148,6 @@ def i2c_read(bus, addr, reg, type, num):
         value = value[0]
     
     return value
+
+def end():
+    print("app end");

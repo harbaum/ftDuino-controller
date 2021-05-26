@@ -52,22 +52,43 @@ class EspThread(QThread):
    def run(self):
       esp = None
       args = None
+      vargs = None
       ok = False
       
       try:
          # build the args namespace esptool expects
          args = Namespace()
          
+         # copy all enties from setup file
+         for a in self.setup:
+            setattr(args, a, self.setup[a])
+
+         # We only verify the app portion as the other portions incl
+         # nvm and may/will change during runtime. So we need a special copy
+         # of args for verify.
+         # verify only if we have a single image that starts at 0x1000
+         if len(self.setup["files"]) == 1 and self.setup["files"][0]["addr"] == 0x1000:
+            vargs = Namespace()
+            for a in self.setup:
+               setattr(vargs, a, self.setup[a])
+            
          # map files to addr_filename tuples
          args.addr_filename = []
          for f in self.setup["files"]:
             fh = self.setup["open"](f["filename"], "rb")
             args.addr_filename.append( (f["addr"], fh) )
 
-         # copy all enties from setup file
-         for a in self.setup:
-            setattr(args, a, self.setup[a])
-         
+         # for verify create a ram copy of the firmware which skips to 0x10000
+         if vargs:
+            vargs.addr_filename = []
+            f = self.setup["files"][0]
+            with self.setup["open"](f["filename"], "rb") as fh:
+               fh.read(0x10000 - f["addr"])
+               data = fh.read()
+               dio = io.BytesIO(data)
+               setattr(dio, "name", "app area of {}".format(f["filename"]))
+               vargs.addr_filename.append( (0x10000, dio) )
+            
          esp = esptool.get_default_connected_device(serial_list=[self.port], port=self.port, initial_baud=ESPROM_BAUD, chip=args.chip, connect_attempts=args.connect_attempts)
 
          print("Chip is %s" % (esp.get_chip_description()))
@@ -83,18 +104,26 @@ class EspThread(QThread):
          if args.flash_size != 'keep':
             esp.flash_set_parameters(esptool.flash_size_bytes(args.flash_size))
 
-         if not hasattr(args, "skip_write") or not args.skip_write:
+         do_write = True
+         if vargs:
+            try:
+               esptool.verify_flash(esp, vargs)
+               do_write = False   # verify successful, no need to write
+            except:
+               pass
+
+         if do_write:
             esptool.write_flash(esp, args)
          else:
-            print("<<<<<<<< SKIPPING ACTUAL WRITE >>>>>>>>>>>")
-          
+            print("Firmware verified successfully, skipping flash");
+            
          esp.hard_reset()
 
          esp._port.close()
 
          ok = True
          
-      except Exception as e:
+      except IOException as e:
          self.alert.emit( {
             "title": "esptool",
             "message": "Esptool error",
@@ -113,6 +142,7 @@ class EspThread(QThread):
 # listen for text output of background processes
 class ListenerThread(QThread):
    msg = pyqtSignal(str)
+   progress = pyqtSignal(int)
    
    def __init__(self, config = None):
       super().__init__()
@@ -124,6 +154,15 @@ class ListenerThread(QThread):
             while True:
                line = self.config["rfd"].readline()
                if len(line) == 0: break
+
+               # progress text has the form "Writing at 0xxxxxxxx..(xx %)               
+               if line.startswith("Writing"):
+                  try:
+                     val = int(line.split("(")[1].split("%")[0].strip())
+                     self.progress.emit(val)
+                  except:
+                     pass
+               
                self.msg.emit(line)
          except:
             break
@@ -132,6 +171,7 @@ class ListenerThread(QThread):
 class AmpyThread(QThread):
    done = pyqtSignal(bool)
    text = pyqtSignal(str)
+   progress = pyqtSignal(int)
    alert = pyqtSignal(dict)
 
    def __init__(self, setup):
@@ -235,20 +275,30 @@ class AmpyThread(QThread):
                                         "detail": str(e) } )
                      return False
 
+               self.progress.emit(self.filenum)
+               self.filenum = self.filenum + 1
+
       return True
                      
    def run(self):
       ok = False
       retry = 5
+      self.filenum = 0
 
-      # ctrl-c
+      # for some reason only under windows the esp32 reboots when being freshly
+      # flashed or freshly connected via usb. This confuses ampy. So we trigger this by
+      # purpose here so this won't happen later when ampy runs
+      
+      # Send CTRL-C twice
       self.setup["board"].serial.write(b'\r\x03')
       time.sleep(0.1)
       self.setup["board"].serial.write(b'\x03')
+      # pause 5 seconds to let the board reboot 
       time.sleep(5)
         
       while not ok and retry:
-         # try to get into repl mode. This sometimes needs a retry under windows ...
+         # try to get into repl mode. This sometimes needs a retry under
+         # windows (actually related to the aforementioned issue)
          try:
             self.setup["board"].enter_raw_repl()
             self.setup["board"].exit_raw_repl()
@@ -287,7 +337,56 @@ class Window(QMainWindow):
    def on_exit(self):
       if hasattr(self, "zip") and self.zip:
          self.zip.close()
-   
+
+   def check_files(self, entries, path = None):
+      # return the number of files or an error if a file
+      # doesn't exist
+      cnt = 0
+      
+      for f in entries:
+         if isinstance(f, dict):
+            if "filename" in f:
+               if path:  fname = os.path.join(path, f["filename"])
+               else:     fname = f["filename"]
+               
+               if not "files" in f:
+                  try:
+                     f = self.setup["open"](fname, "r")
+                     f.close()
+                     cnt = cnt + 1
+                  except:
+                     # return file name if it couldn't be opened
+                     return fname
+               else:
+                  res = self.check_files(f["files"], fname)
+                  if isinstance(res, str): return res
+                  cnt = cnt + res
+
+      return cnt
+         
+   def check_setup_files(self):
+      esptfiles = None
+      ampyiles = None
+      
+      # walk through the entire setup and search for files
+      if "esptool" in self.setup and "files" in self.setup["esptool"]:
+         esptfiles = self.check_files(self.setup["esptool"]["files"])
+
+      if "ampy" in self.setup and "files" in self.setup["ampy"]:         
+         ampyfiles = self.check_files(self.setup["ampy"]["files"])
+
+      if isinstance(esptfiles, str):
+         self.alert( { "text": "Error", "message": "Missing firmware file {}".format(esptfiles) } )
+         return False
+      
+      if isinstance(ampyfiles, str):
+         self.alert( { "text": "Error", "message": "Missing support file {}".format(ampyfiles) } )
+         return False
+
+      # we actually only care for the ampy files as the esptool has its own progress indicator
+      self.ampyfiles = ampyfiles
+      return True
+         
    # load setup and enable install button on success
    def load_setup(self, fname, quiet=False):
       # check if this is a zip file we are trying to load
@@ -325,7 +424,8 @@ class Window(QMainWindow):
                           "message": "Loading of {} failed".format(fname),
                           "detail": str(e) })
          
-      if self.setup and "name" in self.setup:
+      # we have a valid setup. Make sure all dependecies are met
+      if self.setup and "name" in self.setup and self.check_setup_files():
          self.statusBar().showMessage("Ready to install \"{}\"".format(self.setup["name"]))
          self.btnInstall.setEnabled(True)
          return True
@@ -333,7 +433,7 @@ class Window(QMainWindow):
          self.statusBar().showMessage("No configuration loaded")
          self.btnInstall.setEnabled(False)
          return False
-         
+
    def start_redirect(self):
       # connection to server thread to receive data
       # self.listener_thread.done.connect(self.on_bg_done)
@@ -353,6 +453,7 @@ class Window(QMainWindow):
            "rfd": self._r
          })
       self.listener_thread.msg.connect(self.text_out);
+      self.listener_thread.progress.connect(self.espt_progress);
       self.listener_thread.start()
 
    def stop_redirect(self):
@@ -361,6 +462,27 @@ class Window(QMainWindow):
       self._r.close()
       sys.stdout = self._stdout
       sys.stderr = self._stderr
+
+   def progress(self, perc):
+      self.progressBar.setValue(perc)
+      
+   def ampy_progress(self, files):
+      # if there's a esptool firmware to be flashed then this equals
+      # 10 ampy files on the progress bar      
+      if "esptool" in self.setup:
+         perc = int((100*(10+files))//(10+self.ampyfiles))
+      else:
+         perc = int((100*files)//self.ampyfiles)
+      
+      self.progress(perc)
+      
+   def espt_progress(self, perc):
+      # for a rough estimate ten ampy file count like the firmware image
+      if hasattr(self, "ampyfiles") and self.ampyfiles:
+         # esp progress is  10/(10+self.ampyfiles)
+         self.progress(int(perc * 10/(10+self.ampyfiles)))
+      else:
+         self.progress(perc)
       
    def alert(self, data):
       msg = QMessageBox()
@@ -418,10 +540,13 @@ class Window(QMainWindow):
          self.text_out("Installation failed");      
          self.statusBar().showMessage("File upload failed");
          
+      self.progress(100)
       self.btnInstall.setEnabled(True)
+      self.btnSel.setEnabled(True)
 
    def on_install_files(self):
       self.btnInstall.setEnabled(False)
+      self.btnSel.setEnabled(False)
          
       if not "ampy" in self.setup or not "files" in self.setup["ampy"]:
          self.text_out("No files to install\n");
@@ -448,6 +573,7 @@ class Window(QMainWindow):
       self.thread = AmpyThread(self.setup["ampy"])
       self.thread.alert.connect(self.alert)
       self.thread.text.connect(self.text_out)
+      self.thread.progress.connect(self.ampy_progress)
       self.thread.done.connect(self.on_ampy_done)
       self.thread.start()
          
@@ -470,6 +596,8 @@ class Window(QMainWindow):
    def on_install_firmware(self):
       self.text.clear();
       self.btnInstall.setEnabled(False)
+      self.btnSel.setEnabled(False)
+      self.progress(0)
 
       if "esptool" in self.setup:
          self.statusBar().showMessage("Flashing firmware");
@@ -489,17 +617,38 @@ class Window(QMainWindow):
       self.text.moveCursor(QTextCursor.End)
       if not hasattr(self, 'tf') or not self.tf:
          self.tf = self.text.currentCharFormat()
-#         self.tf.setFontWeight(QFont.Bold);
       if color:
          tf = self.text.currentCharFormat()
          tf.setForeground(QBrush(QColor(color)))
          self.text.textCursor().insertText(str, tf);
       else:
          self.text.textCursor().insertText(str, self.tf);
-            
+
+   def on_request_resize(self):
+      if self.savedSize[self.text.isHidden()]:
+         self.resize(self.savedSize[self.text.isHidden()])
+         
+   def onShowHideDetails(self):
+      # show/hide the text detail box
+      self.savedSize[self.text.isHidden()] = self.size()
+         
+      if self.text.isHidden():
+         self.text.setHidden(False)         
+         self.details_but.setText("Hide details...")
+      else:
+         self.text.setHidden(True)
+         self.details_but.setText("Show details...")
+         
+      self.shrinktimer = QTimer()
+      self.shrinktimer.setSingleShot(True)
+      self.shrinktimer.timeout.connect(self.on_request_resize)
+      self.shrinktimer.start(10)
+         
    def gui(self):
+      self.savedSize = { True: None, False: QSize(480,480) }
+         
       widget = QWidget()
-      vbox = QVBoxLayout()           
+      self.vbox = QVBoxLayout()           
 
       # create a dropdown list of serial ports
       self.cb = QComboBox()
@@ -507,40 +656,59 @@ class Window(QMainWindow):
       ports = serial.tools.list_ports.comports()
       for p in ports:
          self.cb.addItem(str(p), p)
-      vbox.addWidget(self.cb)
+      self.vbox.addWidget(self.cb)
 
       # add a hbox for file name and selector
       fname_w = QWidget()
       fnamebox = QHBoxLayout()
+      fnamebox.setContentsMargins(0,0,0,0)
       fname_w.setLayout(fnamebox)
       self.fname = QLineEdit();
-      self.fname.setPlaceholderText("Please select a file")
+      self.fname.setPlaceholderText("Please select firmware file")
       fnamebox.addWidget(self.fname)   
-      fname_but = QPushButton("Select...")
-      fname_but.pressed.connect(self.getfile)
-      fnamebox.addWidget(fname_but)      
-      vbox.addWidget(fname_w)
+      self.btnSel = QPushButton("Select...")
+      self.btnSel.pressed.connect(self.getfile)
+      fnamebox.addWidget(self.btnSel)
+      self.vbox.addWidget(fname_w)
 
-      # main text view
+      # the progress bar and the "Show Details" button
+      progress_w = QWidget()
+      progressbox = QHBoxLayout()
+      progressbox.setContentsMargins(0,0,0,0)
+      progress_w.setLayout(progressbox)
+      self.progressBar = QProgressBar()
+      # self.progressBar.setValue(50)
+      progressbox.addWidget(self.progressBar)   
+      self.details_but = QPushButton("Show details...")
+      self.details_but.pressed.connect(self.onShowHideDetails)
+      progressbox.addWidget(self.details_but)      
+      self.vbox.addWidget(progress_w)
+      
+      # the main text view is initially hidden
       self.text = QTextEdit()
+      self.text.setHidden(True)
       self.text.setReadOnly(True);
-      self.text.setText("ftDuino32 installation tool\nPlease select the appropriate com "+
-                        "port and a ZIP file containing the firmware you want to install "+
-                        "and click the 'Install...' button below.")
-      vbox.addWidget(self.text)
+      self.text.setText("ftDuino32 installation tool\n"+
+                        "Please select the appropriate COM "+
+                        "port and a ZIP file containing the firmware you want to install.\n"+
+                        "Finally click the 'Install...' button below.")
+      self.vbox.addWidget(self.text,1)
 
-      # Test button
+      # don't stretch at all if text is visible
+      self.vbox.addStretch(0)
+         
+      # Install button
       self.btnInstall = QPushButton("Install...")
       self.btnInstall.pressed.connect(self.on_install_firmware)
       self.btnInstall.setEnabled(False)
-      vbox.addWidget(self.btnInstall)            
+      self.vbox.addWidget(self.btnInstall)            
 
-      widget.setLayout(vbox)
+      widget.setLayout(self.vbox)
       return widget
       
    def initUI(self):
       self.setCentralWidget(self.gui())
-      self.resize(640,400)
+      self.resize(480,150)
       self.setWindowTitle("ftDuino32 installer")
 
       # quietly try to load the default file from file path or from current path

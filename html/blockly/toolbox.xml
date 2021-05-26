@@ -72,7 +72,6 @@
   </category>
 
   <category name="ftDuino" colour="90">
-    <block type="ftduino_i2c_scan"></block>
     <block type="ftduino_set_addr">
       <value name="ADDRESS">
         <shadow type="math_number">
@@ -84,21 +83,29 @@
       <field name="MODE">0x02</field>
     </block>
     <block type="ftduino_input_value"></block>
-    <block type="ftduino_output_mode">
-      <field name="MODE">0x01</field>
-    </block>
-    <block type="ftduino_output_value">
+    <block type="ftduino_output">
       <value name="VALUE">
         <shadow type="math_number">
           <field name="NUM">255</field>
         </shadow>
       </value>
     </block>
+    <block type="ftduino_motor">
+      <value name="VALUE">
+        <shadow type="math_number">
+          <field name="NUM">255</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="ftduino_motor_stop"></block>
+    <sep gap="50"></sep>
+    <block type="ftduino_i2c_scan"></block>
     <block type="i2c_read"></block>
     <block type="i2c_write"></block>
   </category>
   <category name="Misc" colour="60">
-    <block type="start"></block>
+    <block type="end"></block>
+    <sep gap="50"></sep>
     <block type="delay">
       <value name="TIME">
         <shadow type="math_number">
@@ -106,6 +113,7 @@
         </shadow>
       </value>
     </block>
+    <sep gap="50"></sep>
     <block type="mqtt_connect"></block>
     <block type="mqtt_disconnect"></block>
     <block type="mqtt_publish"></block>

@@ -1,7 +1,7 @@
 from llvgl import *
 from mqtt import mqtt
-import ftduino
 from machine import Pin, I2C
+import ftduino
 
 i2cBus = I2C(0,scl=Pin(22),sda=Pin(21))
 button = None
@@ -14,12 +14,12 @@ def on_mqtt_led(message):
     global button, led, object2, state, i2cBus
     state = message == 'on'
     widget_set_value(led,state)
+    ftduino.i2c_write(i2cBus, 43, ftduino.OUTPUT_MODE.O1, ftduino.I2C_TYPE.BYTE, ftduino.OUTPUT_MODE.HI)
     ftduino.i2c_write(i2cBus, 43, ftduino.OUTPUT_VALUE.O1, ftduino.I2C_TYPE.BYTE, (255 if state else 0))
 
 # Describe this function...
 def setup_led():
     global button, led, object2, message, state, i2cBus
-    ftduino.i2c_write(i2cBus, 43, ftduino.OUTPUT_MODE.O1, ftduino.I2C_TYPE.BYTE, ftduino.OUTPUT_MODE.HI)
     led = widget_new(TYPE.LED);
     widget_set_value(led,False)
     widget_set_align(led, button, ALIGN.BELOW, 40);
