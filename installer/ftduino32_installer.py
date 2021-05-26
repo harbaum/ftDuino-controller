@@ -364,10 +364,10 @@ class Window(QMainWindow):
 
       return cnt
          
-   def check_setup_files(self):
+   def check_setup_files(self, quiet=False):
       esptfiles = None
       ampyiles = None
-      
+
       # walk through the entire setup and search for files
       if "esptool" in self.setup and "files" in self.setup["esptool"]:
          esptfiles = self.check_files(self.setup["esptool"]["files"])
@@ -376,11 +376,13 @@ class Window(QMainWindow):
          ampyfiles = self.check_files(self.setup["ampy"]["files"])
 
       if isinstance(esptfiles, str):
-         self.alert( { "text": "Error", "message": "Missing firmware file {}".format(esptfiles) } )
+         if not quiet:
+            self.alert( { "text": "Error", "message": "Missing firmware file {}".format(esptfiles) } )
          return False
       
       if isinstance(ampyfiles, str):
-         self.alert( { "text": "Error", "message": "Missing support file {}".format(ampyfiles) } )
+         if not quiet:
+            self.alert( { "text": "Error", "message": "Missing support file {}".format(ampyfiles) } )
          return False
 
       # we actually only care for the ampy files as the esptool has its own progress indicator
@@ -425,7 +427,7 @@ class Window(QMainWindow):
                           "detail": str(e) })
          
       # we have a valid setup. Make sure all dependecies are met
-      if self.setup and "name" in self.setup and self.check_setup_files():
+      if self.setup and "name" in self.setup and self.check_setup_files(quiet):
          self.statusBar().showMessage("Ready to install \"{}\"".format(self.setup["name"]))
          self.btnInstall.setEnabled(True)
          return True
