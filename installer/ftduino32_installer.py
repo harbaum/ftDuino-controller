@@ -75,16 +75,23 @@ class EspThread(QThread):
          # map files to addr_filename tuples
          args.addr_filename = []
          for f in self.setup["files"]:
-            fh = self.setup["open"](f["filename"], "rb")
-            args.addr_filename.append( (f["addr"], fh) )
+            # load file into ram as older python version cannot
+            # seek within zip files but esptool expects to be
+            # able to seek
+            with self.setup["open"](f["filename"], "rb") as fh:
+               data = fh.read()
+               fh = io.BytesIO(data)
+               setattr(fh, "name", f["filename"])
+               args.addr_filename.append( (f["addr"], fh) )
 
          # for verify create a ram copy of the firmware which skips to 0x10000
          if vargs:
             vargs.addr_filename = []
             f = self.setup["files"][0]
             with self.setup["open"](f["filename"], "rb") as fh:
-               fh.read(0x10000 - f["addr"])
-               data = fh.read()
+               # get access to full image data but skip the first
+               # (0x10000 - addr) = 0xf000 bytes
+               data = args.addr_filename[0][1].getbuffer()[0x10000 - f["addr"]:]
                dio = io.BytesIO(data)
                setattr(dio, "name", "app area of {}".format(f["filename"]))
                vargs.addr_filename.append( (0x10000, dio) )
@@ -133,9 +140,8 @@ class EspThread(QThread):
       if esp:
          esp._port.close()
 
-      if args:
-         for f in args.addr_filename:
-            f[1].close()
+      # since the files are now stored in memory we don't have to
+      # close them here anymore
             
       self.done.emit(ok)
 
