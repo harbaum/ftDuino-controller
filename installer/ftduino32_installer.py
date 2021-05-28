@@ -78,22 +78,30 @@ class EspThread(QThread):
             # load file into ram as older python version cannot
             # seek within zip files but esptool expects to be
             # able to seek
-            with self.setup["open"](f["filename"], "rb") as fh:
+
+            # read "source" if present, otherwise read "filename"
+            if "source" in f: fname = f["source"]
+            else:             fname = f["filename"]
+            
+            with self.setup["open"](fname, "rb") as fh:
                data = fh.read()
                fh = io.BytesIO(data)
-               setattr(fh, "name", f["filename"])
+               setattr(fh, "name", fname)
                args.addr_filename.append( (f["addr"], fh) )
 
          # for verify create a ram copy of the firmware which skips to 0x10000
          if vargs:
             vargs.addr_filename = []
             f = self.setup["files"][0]
-            with self.setup["open"](f["filename"], "rb") as fh:
+            if "source" in f: fname = f["source"]
+            else:             fname = f["filename"]
+            
+            with self.setup["open"](fname, "rb") as fh:
                # get access to full image data but skip the first
                # (0x10000 - addr) = 0xf000 bytes
                data = args.addr_filename[0][1].getbuffer()[0x10000 - f["addr"]:]
                dio = io.BytesIO(data)
-               setattr(dio, "name", "app area of {}".format(f["filename"]))
+               setattr(dio, "name", "app area of {}".format(fname))
                vargs.addr_filename.append( (0x10000, dio) )
             
          esp = esptool.get_default_connected_device(serial_list=[self.port], port=self.port, initial_baud=ESPROM_BAUD, chip=args.chip, connect_attempts=args.connect_attempts)
@@ -226,14 +234,23 @@ class AmpyThread(QThread):
    
    def install_files(self, path, files):
       for file in files:
-         if "filename" in file:
+         # check if this file has an "option" rule that may limit the installation
+         do_install = True
+         if "option" in file:
+            if file["option"][0] in self.setup["config"]:
+               if self.setup["config"][file["option"][0]] != file["option"][1]:
+                  if "filename" in file:
+                     self.text.emit("Skipping \"{}\" due to user config\n".format(file["filename"]))
+                  do_install = False
+         
+         if do_install and "filename" in file:
             if path: fname = os.path.join(path, file["filename"])
             else:    fname = file["filename"]
-            
+
             # os.path.join uses machine specific path delimiter. On
             # windows this will use \ which the esp32 will not understand
             espfname = fname.replace("\\", "/")
-            
+
             # anything that has "files" in it is a directory
             if "files" in file:
                # if there's a comment, then print it
@@ -250,13 +267,20 @@ class AmpyThread(QThread):
                   
                if not self.install_files(fname, file["files"]):
                   return False
-            else:               
-               self.text.emit("File \"{}\"... ".format(espfname))
-               
+            else:
+               # if a soure given then read from that
+               if "source" in file:
+                  if path: src_name = os.path.join(path, file["source"])
+                  else:    src_name = file["source"]
+                  self.text.emit("File \"{}\" (source {})... ".format(espfname, src_name))
+               else:
+                  src_name = fname            
+                  self.text.emit("File \"{}\"... ".format(espfname))
+
                # compare hashes to check if we need to update the file
                hash1 = self.sha1sum(espfname)
                if hash1:
-                  hash2 = self.sha1sum_local(fname)
+                  hash2 = self.sha1sum_local(src_name)
                   if not hash2: return False
                   
                   if hash1 == hash2:
@@ -269,7 +293,7 @@ class AmpyThread(QThread):
                # need to send data?
                if not hash1 or (hash2 and hash1 != hash2):
                   try:
-                     with self.setup["open"](fname, 'rb') as infile:
+                     with self.setup["open"](src_name, 'rb') as infile:
                         data = infile.read()
                         self.text.emit("uploading {} bytes... ".format(len(data)));
                         self.setup["ampy_files"].put(espfname, data)
@@ -394,7 +418,49 @@ class Window(QMainWindow):
       # we actually only care for the ampy files as the esptool has its own progress indicator
       self.ampyfiles = ampyfiles
       return True
+
+   def setup_configuration_gui(self, setup):
+      def on_config_changed(a):
+         self.config[self.sender().property("id")] = self.sender().itemData(a);
+      
+      self.config = {}
+      
+      # remove any previous widget
+      if self.config_w.layout() != None:
+         item = self.config_w.layout().takeAt(0)
+         while item != None:
+            item.widget().deleteLater()
+            item = self.config_w.layout().takeAt(0)
+
+         vbox = self.config_w.layout()
+      else:
+         vbox = QVBoxLayout()
+         vbox.setContentsMargins(0,0,0,0)
+         self.config_w.setLayout(vbox)         
          
+      if setup and "configuration" in setup:
+         # title/id
+         for co in setup["configuration"]:
+            w = QWidget()            
+            hbox = QHBoxLayout()
+            hbox.setContentsMargins(0,0,0,0)
+            w.setLayout(hbox)
+
+            label = QLabel(co["title"])
+            hbox.addWidget(label)
+            
+            cb = QComboBox()
+            cb.setProperty("id", co["id"])
+            cb.currentIndexChanged.connect(on_config_changed)
+            cb.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon);
+            for o in co["options"]:
+               cb.addItem(o[0], o[1] )
+            hbox.addWidget(cb)
+            
+            self.config[co["id"]] = co["options"][0][1]
+
+            vbox.addWidget(w)
+
    # load setup and enable install button on success
    def load_setup(self, fname, quiet=False):
       # check if this is a zip file we are trying to load
@@ -434,10 +500,12 @@ class Window(QMainWindow):
          
       # we have a valid setup. Make sure all dependecies are met
       if self.setup and "name" in self.setup and self.check_setup_files(quiet):
+         self.setup_configuration_gui(self.setup)         
          self.statusBar().showMessage("Ready to install \"{}\"".format(self.setup["name"]))
          self.btnInstall.setEnabled(True)
          return True
       else:
+         self.setup_configuration_gui(None)         
          self.statusBar().showMessage("No configuration loaded")
          self.btnInstall.setEnabled(False)
          return False
@@ -578,6 +646,7 @@ class Window(QMainWindow):
 
       # run ampy in background
       self.setup["ampy"]["open"] = self.setup["open"]
+      self.setup["ampy"]["config"] = self.config
       self.thread = AmpyThread(self.setup["ampy"])
       self.thread.alert.connect(self.alert)
       self.thread.text.connect(self.text_out)
@@ -679,6 +748,10 @@ class Window(QMainWindow):
       fnamebox.addWidget(self.btnSel)
       self.vbox.addWidget(fname_w)
 
+      # empty widget to add configuration to
+      self.config_w = QWidget()
+      self.vbox.addWidget(self.config_w)      
+      
       # the progress bar and the "Show Details" button
       progress_w = QWidget()
       progressbox = QHBoxLayout()

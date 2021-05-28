@@ -1,6 +1,17 @@
 {
     "name": "ftDuino32 firmware setup",
     "comment": "This is the setup configuration for the ftduino32_installer tool",
+    "version": 1,
+    
+    "configuration": [
+	{ "title": "Please select your board type",
+	  "id": "board_type",
+	  "options": [
+	      [ "ftDuino32 prototype", "ftduino" ],
+	      [ "Breadboard setup", "breadboard" ]	      
+	  ]
+	}
+    ],
     
     "esptool": {
 	"baud": 460800,
@@ -30,7 +41,8 @@
 	    { "filename": "boot.py" },
 	    { "filename": "main.py" },
 	    { "filename": "ftduino.py" },
-	    { "filename": "gui.py" },
+	    { "filename": "gui.py", "option": [ "board_type", "ftduino" ] },
+	    { "filename": "gui.py", "source": "gui_bb.py", "option": [ "board_type", "breadboard" ] },
 	    { "filename": "llvgl.py" },
 	    { "filename": "mqtt.py" },
 	    { "filename": "http_server.py" },	    
