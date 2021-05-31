@@ -181,7 +181,7 @@ class ListenerThread(QThread):
          except:
             break
          
-# run esptool in the background
+# run ampy in the background
 class AmpyThread(QThread):
    done = pyqtSignal(bool)
    text = pyqtSignal(str)
@@ -347,6 +347,131 @@ class AmpyThread(QThread):
       else:
          self.done.emit(self.install_files(None, self.setup["files"]))
          
+# run ampy for backup in the background
+class BackupThread(QThread):
+   done = pyqtSignal(bool)
+   text = pyqtSignal(str)
+   alert = pyqtSignal(dict)
+
+   def __init__(self, setup):
+      super().__init__()
+      self.setup = setup
+
+   def backup_file(self, filename):
+      self.text.emit("Backing up {}\n".format(filename))
+      
+      # try to treat as file. Will fail on directories in
+      # which case we retry with listing
+      try:
+         data = self.setup["ampy_files"].get(filename)
+
+         # don't use absolute paths to avoid trouble if someone
+         # actually tries to unzip the file
+         if filename.startswith("/"):
+            filename = filename[1:]
+
+         try:
+            with self.zip.open(filename, mode='w') as f:
+               f.write(data)
+               f.close()
+         except Exception as e:
+            self.text.emit("Error: {}\n".format(str(e)))
+            return False            
+            
+      except (pyboard.PyboardError, Exception) as e:
+         if str(e).lower().startswith("no such"):
+            try:
+               files = self.setup["ampy_files"].ls(filename, long_format=False)
+               # process all files, stop on error
+               for f in files:
+                  if not self.backup_file(f):
+                     return False
+               
+            except (pyboard.PyboardError, Exception) as e:
+               if not str(e).lower().startswith("no such"):
+                  self.text.emit("Error: {}\n".format(str(e)))
+                  return False
+      return True
+      
+   def run(self):
+      if not "filename" in self.setup:
+         self.text.emit("No filename given\n")
+         self.done.emit(False)
+         return
+
+      # create zip file
+      self.zip = zipfile.ZipFile(self.setup["filename"], 'w')
+      
+      for f in self.setup["files"]:
+         self.backup_file(f)
+
+      self.zip.close()
+         
+      self.done.emit(True)
+
+# run ampy for restore in the background
+class RestoreThread(QThread):
+   done = pyqtSignal(bool)
+   text = pyqtSignal(str)
+   alert = pyqtSignal(dict)
+
+   def __init__(self, setup):
+      super().__init__()
+      self.setup = setup
+
+   def restore_file(self, filename):
+      self.text.emit("Restoring {} ... ".format(filename))
+
+      try:
+         with self.zip.open(filename, 'r') as infile:
+            data = infile.read()
+            self.text.emit("{} bytes... ".format(len(data)));
+            self.setup["ampy_files"].put(filename, data)
+            self.text.emit("ok\n");
+            infile.close()
+            return True
+      except Exception as e:
+         self.text.emit("error {}\n".format(str(e)));
+         self.alert.emit( { "title": "Restore error",
+                            "message": "Restore error on {}".format(filename),
+                            "detail": str(e) } )
+      return False      
+      
+   def run(self):
+      if not "filename" in self.setup:
+         self.text.emit("No filename given\n")
+         self.done.emit(False)
+         return
+
+      # open zip file
+      try:
+         self.zip = zipfile.ZipFile(self.setup["filename"], 'r')
+      except Exception as e:
+         self.alert.emit( { "title": "Restore error",
+                            "message": "Unable to open ZIP",
+                            "detail": str(e) } )
+         self.done.emit(False)
+         return
+
+      # walk over all files in zip
+      files = self.zip.namelist()
+      for f in files:
+         # check if file matches on of the patterns
+         ok = False
+         for p in self.setup["files"]:
+            # files are stored without leading slash
+            if p.startswith("/"): p = p[1:]
+            if f.startswith(p): ok = True
+
+         if ok:
+            self.restore_file(f)
+         else:
+            self.text.emit("Skipping unexpected file in backup {}\n", f);
+      
+      self.zip.close()
+         
+      self.done.emit(True)
+
 class Window(QMainWindow):
    def __init__(self, app):
       super(Window, self).__init__()
@@ -395,6 +520,8 @@ class Window(QMainWindow):
       return cnt
          
    def check_setup_files(self, quiet=False):
+      if not self.setup: return False
+      
       esptfiles = None
       ampyiles = None
 
@@ -461,6 +588,24 @@ class Window(QMainWindow):
 
             vbox.addWidget(w)
 
+   def enable_gui(self, on):
+      self.btnSel.setEnabled(on)
+         
+      if on and self.setup:
+         self.btnInstall.setEnabled(True)
+         
+         # also enable the backup restore of there's such info in the setup
+         if "backup" in self.setup:
+            self.btnBackup.setEnabled(True)
+            self.btnRestore.setEnabled(True)
+         else:
+            self.btnBackup.setEnabled(False)
+            self.btnRestore.setEnabled(False)
+      else:            
+         self.btnInstall.setEnabled(False)
+         self.btnBackup.setEnabled(False)
+         self.btnRestore.setEnabled(False)
+         
    # load setup and enable install button on success
    def load_setup(self, fname, quiet=False):
       # check if this is a zip file we are trying to load
@@ -497,17 +642,21 @@ class Window(QMainWindow):
             self.alert( { "title": "Error",
                           "message": "Loading of {} failed".format(fname),
                           "detail": str(e) })
+
+      # check if all depending files are present
+      if not self.check_setup_files(quiet):
+         self.setup = None
+
+      self.enable_gui(True)
          
       # we have a valid setup. Make sure all dependecies are met
-      if self.setup and "name" in self.setup and self.check_setup_files(quiet):
+      if self.setup and "name" in self.setup:
          self.setup_configuration_gui(self.setup)         
          self.statusBar().showMessage("Ready to install \"{}\"".format(self.setup["name"]))
-         self.btnInstall.setEnabled(True)
          return True
       else:
          self.setup_configuration_gui(None)         
          self.statusBar().showMessage("No configuration loaded")
-         self.btnInstall.setEnabled(False)
          return False
 
    def start_redirect(self):
@@ -570,8 +719,7 @@ class Window(QMainWindow):
       msg.exec_()
       
    def getfile(self):
-      fname = QFileDialog.getOpenFileName(self, 'Open file', 
-                     '.',"Installation file (*.json *.zip)")
+      fname = QFileDialog.getOpenFileName(self,'Open file','.',"Installation file (*.json *.zip)")
       if fname[0]:
          self.fname.setText(fname[0])
          self.load_setup(fname[0])      
@@ -617,12 +765,10 @@ class Window(QMainWindow):
          self.statusBar().showMessage("File upload failed");
          
       self.progress(100)
-      self.btnInstall.setEnabled(True)
-      self.btnSel.setEnabled(True)
-
+      self.enable_gui(True)
+         
    def on_install_files(self):
-      self.btnInstall.setEnabled(False)
-      self.btnSel.setEnabled(False)
+      self.enable_gui(False)
          
       if not "ampy" in self.setup or not "files" in self.setup["ampy"]:
          self.text_out("No files to install\n");
@@ -660,7 +806,6 @@ class Window(QMainWindow):
          self.statusBar().showMessage("Firmware installed successfully");
       else:
          self.statusBar().showMessage("Firmware installation failed");
-         self.btnInstall.setEnabled(True)
 
       if state:
          self.text_out("Waiting for firmware to boot ...\n")
@@ -672,8 +817,7 @@ class Window(QMainWindow):
    # run esptool in the background with output redirection
    def on_install_firmware(self):
       self.text.clear();
-      self.btnInstall.setEnabled(False)
-      self.btnSel.setEnabled(False)
+      self.enable_gui(False)
       self.progress(0)
 
       if "esptool" in self.setup:
@@ -690,6 +834,94 @@ class Window(QMainWindow):
       else:
          self.on_install_files()
 
+   def on_backup_done(self, state):
+      if state: self.statusBar().showMessage("Backup successful");
+      else:     self.statusBar().showMessage("Backup failed");
+      self.enable_gui(True)
+      self.progressBar.setMaximum(100)
+      self.board_reset()
+      
+   def do_backup(self, bak_name):
+      self.enable_gui(False)
+      self.progressBar.setMaximum(0)  # indefinite biusy
+      self.text.clear();
+      self.text_out("Creating backup {} ...\n".format(bak_name));
+      self.statusBar().showMessage("Creating backup");
+
+      port = self.get_port();
+      
+      try:
+         self.setup["backup"]["filename"] = bak_name
+         self.setup["backup"]["board"] = pyboard.Pyboard(port, baudrate=AMPY_BAUD, wait=1, rawdelay=0.1)
+         self.setup["backup"]["ampy_files"] = ampy.files.Files(self.setup["backup"]["board"])
+      except (pyboard.PyboardError, Exception) as e:
+         self.alert( { "title": "Error",
+                       "message": "Ampy backup error",
+                       "info": "Exception when opening\n"+str(port),
+                       "detail": str(e) } )
+         return
+
+      # run ampy in background
+      self.thread = BackupThread(self.setup["backup"])
+      self.thread.alert.connect(self.alert)
+      self.thread.text.connect(self.text_out)
+      self.thread.done.connect(self.on_backup_done)
+      self.thread.start()
+         
+   def onBackup(self):      
+      if not "backup" in self.setup or not "files" in self.setup["backup"]:
+         self.text_out("No backup configured\n");
+         self.on_backup_done(False)
+         return
+
+      fname = QFileDialog.getSaveFileName(self,'Create backup','.',"Backup archive (*.zip)")
+      if fname[0]:
+         self.do_backup(fname[0])
+      
+   def on_restore_done(self, state):
+      if state: self.statusBar().showMessage("Restore successful");
+      else:     self.statusBar().showMessage("Restore failed");
+      self.enable_gui(True)
+      self.progressBar.setMaximum(100)
+      self.board_reset()
+      
+   def do_restore(self, bak_name):
+      self.enable_gui(False)
+      self.progressBar.setMaximum(0)  # indefinite biusy
+      self.text.clear();
+      self.text_out("Restoring backup {} ...\n".format(bak_name));
+      self.statusBar().showMessage("Restoring backup");
+
+      port = self.get_port();
+      
+      try:
+         self.setup["backup"]["filename"] = bak_name
+         self.setup["backup"]["board"] = pyboard.Pyboard(port, baudrate=AMPY_BAUD, wait=1, rawdelay=0.1)
+         self.setup["backup"]["ampy_files"] = ampy.files.Files(self.setup["backup"]["board"])
+      except (pyboard.PyboardError, Exception) as e:
+         self.alert( { "title": "Error",
+                       "message": "Ampy backup error",
+                       "info": "Exception when opening\n"+str(port),
+                       "detail": str(e) } )
+         return
+
+      # run ampy in background
+      self.thread = RestoreThread(self.setup["backup"])
+      self.thread.alert.connect(self.alert)
+      self.thread.text.connect(self.text_out)
+      self.thread.done.connect(self.on_restore_done)
+      self.thread.start()
+         
+   def onRestore(self):
+      if not "backup" in self.setup or not "files" in self.setup["backup"]:
+         self.text_out("No backup configured\n");
+         self.on_backup_done(False)
+         return
+
+      fname = QFileDialog.getOpenFileName(self,'Open backup','.',"Backup archive (*.zip)")
+      if fname[0]:
+         self.do_restore(fname[0])
+         
    def text_out(self, str, color=None):
       self.text.moveCursor(QTextCursor.End)
       if not hasattr(self, 'tf') or not self.tf:
@@ -758,7 +990,6 @@ class Window(QMainWindow):
       progressbox.setContentsMargins(0,0,0,0)
       progress_w.setLayout(progressbox)
       self.progressBar = QProgressBar()
-      # self.progressBar.setValue(50)
       progressbox.addWidget(self.progressBar)   
       self.details_but = QPushButton("Show details...")
       self.details_but.pressed.connect(self.onShowHideDetails)
@@ -770,19 +1001,43 @@ class Window(QMainWindow):
       self.text.setHidden(True)
       self.text.setReadOnly(True);
       self.text.setText("ftDuino32 installation tool\n"+
-                        "Please select the appropriate COM "+
-                        "port and a ZIP file containing the firmware you want to install.\n"+
+                        "Please select the appropriate COM port\n"+
+                        "and a ZIP file containing the firmware you want to install.\n"+
                         "Finally click the 'Install...' button below.")
       self.vbox.addWidget(self.text,1)
 
       # don't stretch at all if text is visible
       self.vbox.addStretch(0)
-         
+
+      buttons_w = QWidget()
+      buttonsbox = QHBoxLayout()
+      buttonsbox.setContentsMargins(0,0,0,0)
+      buttons_w.setLayout(buttonsbox)      
+      
       # Install button
       self.btnInstall = QPushButton("Install...")
-      self.btnInstall.pressed.connect(self.on_install_firmware)
+      self.btnInstall.setToolTip("Install or update the selected firmware");
+      self.btnInstall.clicked.connect(self.on_install_firmware)
       self.btnInstall.setEnabled(False)
-      self.vbox.addWidget(self.btnInstall)            
+      buttonsbox.addWidget(self.btnInstall)
+
+      # backup is only possible with a backup config in the
+      # setup loaded. Restore could always be possible but
+      # would confuse users if the config does not support to
+      # be backuped. So we disable all of them by default
+      self.btnBackup = QPushButton("Backup...")
+      self.btnBackup.setToolTip("Create a backup of user generated data");
+      self.btnBackup.clicked.connect(self.onBackup)
+      buttonsbox.addWidget(self.btnBackup)
+      self.btnBackup.setEnabled(False)
+      self.btnRestore = QPushButton("Restore...")
+      self.btnRestore.setToolTip("Restore a backup of user generated data");
+      self.btnRestore.clicked.connect(self.onRestore)
+      buttonsbox.addWidget(self.btnRestore)
+      self.btnRestore.setEnabled(False)
+      
+      self.vbox.addWidget(buttons_w)            
+      # self.vbox.addWidget(self.btnInstall)            
 
       widget.setLayout(self.vbox)
       return widget

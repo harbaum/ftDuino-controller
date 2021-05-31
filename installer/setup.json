@@ -134,5 +134,12 @@
 	      ]
 	    }
 	]
+    },
+
+    "backup": {
+	"files": [
+	    "/apps",
+	    "/wifi.json"
+	]
     }
 }
