@@ -1,19 +1,19 @@
-# ftDuino32 - ESP32 based blockly/python controller
+# ftDuino remote controller - ESP32 based blockly/python controller
 
-This repository contains the code for the ftDuino32 controller.
+This repository contains the code for the ftDuino remote controller.
 
-## What is the ftDuino32?
+## What is the ftDuino controler?
 
-The ftDuino32 controller is an ESP32 based controller with 240*320
+The ftDuino remote controller is an ESP32 based controller with 240*320
 touchscreen and SD card. It's meant to connect via I²C to an
 [ftDuino](http://ftduino.de) allowing fischertechnik toy robots to
 be programmed in Python and Blockly using nothing but a browser.
 
-The ftDuino32 runs [Micropython](https://micropython.org/) and
+The ftDuino remote controller runs [Micropython](https://micropython.org/) and
 [LVGL](https://lvgl.io/) allowing for touch based user interfaces
 written in Python.
 
-![ftDuino32](ftduino32_www.png)
+![ftDuino remote controller](ftduino32_www.png)
 
 Furthermore the ftDuino includes a native web server with websocket
 capabilities allowing to use the
@@ -32,7 +32,7 @@ In the current state of the firmware it allows the user to:
 - Trigger program execution remotely
 - Get a remote live view of the devices display
 
-![ftDuino32](ftduino32.jpg)
+![ftDuino remote controller](ftduino32.jpg)
 
 ## Videos
 
@@ -44,7 +44,7 @@ In the current state of the firmware it allows the user to:
 The final device is planned to be sold fully assembled. But you can
 run it on off-the-shelf breadboard components.
 
-To run the ftDuino32 setup this way you need:
+To run the ftDuino remote controller setup this way you need:
 
 - ESP32 Wrover with PSRAM
 - ILI9341 based 240*320 touch TFT
@@ -76,7 +76,7 @@ The required wiring (VCC/GND is shared by the touch):
 | 21 | | | | I²C SDA to ftDuino |
 | 22 | | | | I²C SCL to ftDuino |
 
-![ftDuino32 breadboard setup](ftduino32_bb.jpg)
+![ftDuino remote controller breadboard setup](ftduino32_bb.jpg)
 
 ## Firmware setup
 
@@ -103,7 +103,7 @@ python -m pip install --user -r ./requirements.txt
 . ./export.sh
 ```
 
-Apply [patch](https://github.com/harbaum/ftDuino32/tree/main/patches)
+Apply [patch](https://github.com/harbaum/ftDuino-controller/tree/main/patches)
 to add the latest http server including websocket support to the ESP-IDF 4.0:
 
 ```
@@ -121,7 +121,7 @@ sudo apt-get install build-essential libreadline-dev libffi-dev git pkg-config l
 git clone --recurse-submodules https://github.com/littlevgl/lv_micropython.git
 ```
 
-Apply [patches](https://github.com/harbaum/ftDuino32/tree/main/patches):
+Apply [patches](https://github.com/harbaum/ftDuino-controller/tree/main/patches):
 ```
 cd lv_micropython
 patch -p1 < http_server.patch
@@ -130,7 +130,7 @@ patch -p1 < uzlib_compression.patch
 ```
 
 This will add web server support to the micropythin bindings, increase
-RAM access speed, add ftDuino32 LVGL theming, disable a few
+RAM access speed, add ftDuino remote controller LVGL theming, disable a few
 unused things to save memory and add zlib/gzip compression to
 Micropython.
 
@@ -183,6 +183,6 @@ Finally the [html](html/) pages need to be copies to the internal flash
 using the [install script](html/install.sh).
 
 If everthing has been setup correctly the firmware will boot into a
-user interface allowing it to be integrated into any WLAN which in turn
-can be used to log into the ftDuino32 with a browser to write and run
-custom Python applications.
+user interface allowing it to be integrated into any WLAN which in
+turn can be used to log into the ftDuino remote controller with a
+browser to write and run custom Python applications.
