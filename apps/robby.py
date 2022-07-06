@@ -115,11 +115,14 @@ class FtRobby:
         elif event == 3:  # GATTS write
             conn_handle, value_handle = data
             value = self._ble.gatts_read(value_handle)
-            if conn_handle == 0:
-                # 
-              
-                if len(value) == 1:
-                    if value[0] == 0:
+            if conn_handle == 0:  # robby service
+
+                # Command
+                if value_handle == self._handle[0][0]:
+
+                    # FT_EC_CMD_SET_MOTOR_DIRECT_DRIVE             
+                    if value[0] == 0 and len(value) == 1:
+                        # enter direct mode, cancel all other tasks
                         print("STOP")
                         if self.task:
                             print("CANCEL TASK")
@@ -127,37 +130,53 @@ class FtRobby:
                             # an "all stopped" status instead
                             self.update_status( [ 0, 0x0f,0xf8, 0], [ 0,0,0,0 ] )
                             self.task = None
+
+                    # FT_EC_CMD_SET_MOTOR_SPUR_MODUS
+                    elif value[0] == 1 and len(value) == 4:
+                        # value[1]: line follower mode
+                        # bit 0 = 1: start follower
+                        # bit 2 = 1: stop if line lost
+                        # value[3]: speed of second motor of line lost
+                        if value[1] == 5 and value[3] == 0:
+                            _, _, s, _ = struct.unpack("bbbb", value)
+                            self.follow(s)
+                        else:
+                            print("unexpected", value)
+    
+                    # FT_EC_CMD_START_MOTOR_RUN_TIME
+                    elif value[0] == 4 and len(value) == 8:
+                        # value[3] = pwm after command (0=brake, 1=free running)
+                        if value[3] == 1 and value[7] == 0:                       
+                            _, l, r, _, d, id, _ = struct.unpack("bbbbhbb", value)
+                            self.drive_for(id, l, r, d)
+                        else:
+                            print("unexpected", value)
+
+                    # FT_EC_CMD_SETUP_SPUR
+                    elif value[0] == 52 and len(value) == 2:
+                        if value[1] == 1:
+                            self.calibrate()
+                        else:
+                            print("unexpected", value)
+
+                # Motor 1/2
+                elif value_handle == self._handle[0][1]:
+                    if len(value) == 3:
+                        if value[2] == 0:
+                            l, r, _ = struct.unpack("bbb", value)
+                            print("DRIVE", str(l)+"%", str(r)+"%")
+                        else:
+                            print("unexpected", value)
                     else:
                         print("unexpected", value)
-                elif len(value) == 2:
-                    if value[0] == 52 and value[1] == 1:
-                        self.calibrate()
-                    else:
-                        print("unexpected", value)
-                elif len(value) == 3:
-                    if value[2] == 0:
-                        l, r, _ = struct.unpack("bbb", value)
-                        print("DRIVE", str(l)+"%", str(r)+"%")
-                    else:
-                        print("unexpected", value)
-                elif len(value) == 4:
-                    if value[0] == 1 and value[1] == 5 and value[3] == 0:
-                        _, _, s, _ = struct.unpack("bbbb", value)
-                        self.follow(s)
-                    else:
-                        print("unexpected", value)
-                elif len(value) == 8:
-                    if value[0] == 4 and value[3] == 1 and value[7] == 0:                       
-                        _, l, r, _, d, id, _ = struct.unpack("bbbbhbb", value)
-                        self.drive_for(id, l, r, d)
-                    else:
-                        print("unexpected", value)
+
                 else:
                     print("handle0: ", end="")
                     for i in value:
                         if i > 127: i = i-256
                         print(i, " ", end="")
                     print("")
+
             else:
                 print("GATT write", conn_handle, value)
 
