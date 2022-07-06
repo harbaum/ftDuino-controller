@@ -116,6 +116,8 @@ class FtRobby:
             conn_handle, value_handle = data
             value = self._ble.gatts_read(value_handle)
             if conn_handle == 0:
+                # 
+              
                 if len(value) == 1:
                     if value[0] == 0:
                         print("STOP")
